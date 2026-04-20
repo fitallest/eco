@@ -138,11 +138,8 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                 messages: s.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
             }));
             setSessions(hydrated);
-            // If there are sessions, select the most recent one
-            if (hydrated.length > 0) {
-                const mostRecent = hydrated.sort((a: ChatSession, b: ChatSession) => b.updatedAt.getTime() - a.updatedAt.getTime())[0];
-                setCurrentSessionId(mostRecent.id);
-            }
+            // Don't auto-select a session on startup — keep landing page as the entry point.
+            // User will pick a session from the sidebar or start a new chat.
         } catch (e) {
             console.error("Failed to load sessions", e);
         }
@@ -226,10 +223,17 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
 
   const handleClearHistory = useCallback(() => {
     if (window.confirm("Bạn có chắc chắn muốn xóa TOÀN BỘ lịch sử các đoạn chat?")) {
-        setSessions([]);
-        setCurrentSessionId(null);
+        // Cancel any pending auto-save timer first to avoid race condition
+        if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+        }
+        // Clear storage immediately
         localStorage.removeItem('ECOLAW_CHAT_SESSIONS');
         localStorage.removeItem('ECOLAW_CHAT_HISTORY');
+        // Then update state
+        setSessions([]);
+        setCurrentSessionId(null);
     }
   }, []);
 

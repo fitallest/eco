@@ -2,6 +2,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 
 try { process.loadEnvFile(); } catch (e) {}
 
@@ -164,6 +165,106 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
           text: `⚠️ LỖI HỆ THỐNG\n\n${errorMsg}`, 
           source: 'GEMINI_DIRECT' 
       });
+    }
+  });
+
+  // ── OpenAI (ChatGPT) endpoint ─────────────────────────────────────
+  app.post("/api/openai", async (req, res) => {
+    try {
+      const { prompt, history, agentType, responseStyle, agentConfig, userLevel } = req.body;
+
+      if (!process.env.OPENAI_API_KEY) throw new Error("Thiếu OPENAI_API_KEY trong Environment Variables");
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      // Select model based on User Level
+      let modelName = 'gpt-4o-mini';
+      if (userLevel === 'Enterprise' || userLevel === 'Gold') {
+        modelName = 'gpt-4o';
+      }
+
+      const BASE_SYSTEM_INSTRUCTION = `
+Bạn là ECOLAW.AI - HỆ ĐIỀU HÀNH PHÁP LÝ (LEGAL OS) MÔ PHỎNG VĂN PHÒNG LUẬT SƯ.
+
+VAI TRÒ CỦA BẠN: "Người quản lý văn phòng" (Orchestrator).
+Bạn không chỉ trả lời câu hỏi, bạn vận hành một quy trình xử lý vụ việc qua 8 bước ảo sau đây trước khi xuất ra kết quả:
+
+1. Routing (Lễ tân): Phân loại lĩnh vực (Hình sự, Dân sự, Đất đai...).
+2. Fact-Intake (Lấy lời khai): Kiểm tra dữ liệu đầu vào. NẾU THIẾU THÔNG TIN QUAN TRỌNG -> Dừng lại và hỏi người dùng (Interview Mode).
+3. Legal Research (Tra cứu): Tìm kiếm văn bản luật MỚI NHẤT (2024, 2025, 2026).
+4. Procedure (Thủ tục): Xác định Thẩm quyền (Nộp ở đâu?) và Thời gian.
+5. Risk & Strategy (Chiến lược): Đánh giá tỷ lệ thắng/rủi ro pháp lý.
+6. Drafting (Soạn thảo): Định hình khung nội dung đơn từ (nếu cần).
+7. Quality Control (Kiểm soát): BẮT BUỘC TRÍCH DẪN (Điều X, Khoản Y, Luật Z). Không trích dẫn -> Không tư vấn.
+8. Synthesizer (Tổng hợp): Gom lại thành câu trả lời dễ hiểu nhất cho khách hàng.
+
+QUY TẮC "FACT-INTAKE" (QUAN TRỌNG NHẤT):
+- Nếu người dùng hỏi cộc lốc, TUYỆT ĐỐI KHÔNG trả lời tràng giang đại hải.
+- HÃY HỎI NGƯỢC LẠI để khai thác thêm thông tin.
+
+🔥 QUY TẮC "HUMAN HANDOFF":
+Thêm "[[HUMAN_REQUIRED]]" vào CUỐI câu trả lời nếu: yêu cầu đại diện ra tòa, công chứng, vụ hình sự nghiêm trọng, tài sản trên 10 tỷ, hợp đồng M&A/IPO, hoặc người dùng yêu cầu "Gặp luật sư".
+
+CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
+---
+📍 TRẠNG THÁI HỆ THỐNG
+📂 Phân loại: [Lĩnh vực] | ⚙️ Engine: ChatGPT | 👤 Agent: [Tên]
+---
+🤖 [NỘI DUNG TƯ VẤN]
+---
+⚖️ KHUYẾN NGHỊ & RỦI RO
+---
+💡 GỢI Ý TIẾP THEO
+`;
+
+      const STYLE_INSTRUCTIONS: Record<string, string> = {
+        CONCISE: "🔥 CHẾ ĐỘ TƯ VẤN NHANH: Kết luận ngắn gọn, chỉ nêu số hiệu điều luật, tập trung Actionable Items.",
+        DEEP: "📚 CHẾ ĐỘ CHUYÊN SÂU: Trích dẫn cụ thể (Khoản, Điều, Luật). Phân tích lợi/hại từng phương án."
+      };
+
+      const AGENT_PERSONAS: Record<string, string> = {
+        GENERAL: "Bạn là Luật sư Tổng hợp. Phân tích toàn diện các khía cạnh pháp lý liên quan.",
+        CORPORATE: "Bạn là Luật sư Doanh nghiệp. Tập trung rủi ro thương mại, tuân thủ, thuế và hợp đồng.",
+        REAL_ESTATE: "Bạn là Luật sư Đất đai. Chú trọng quy hoạch, sổ đỏ, tranh chấp và thủ tục nhà đất.",
+        FAMILY: "Bạn là Luật sư Hôn nhân & Gia đình. Tư vấn thấu cảm, tập trung quyền lợi trẻ em và chia tài sản.",
+        CRIMINAL: "Bạn là Luật sư Hình sự. Đánh giá yếu tố cấu thành tội phạm, khung hình phạt và tình tiết giảm nhẹ."
+      };
+
+      const persona = (agentConfig?.systemPrompt !== undefined) ? agentConfig.systemPrompt : (AGENT_PERSONAS[agentType] || AGENT_PERSONAS.GENERAL);
+      const styleInstruction = STYLE_INSTRUCTIONS[responseStyle] || STYLE_INSTRUCTIONS.DEEP;
+      let customKbInstruction = "";
+      if (agentConfig?.isEnabled && agentConfig?.endpointUrl) {
+        customKbInstruction = `🔴 CHẾ ĐỘ HYBRID AGENT: Kết nối KNOWLEDGE BASE: "${agentConfig.endpointUrl}". Ưu tiên thông tin từ nguồn này.`;
+      }
+
+      const systemContent = `${BASE_SYSTEM_INSTRUCTION}\n\n=== AGENT PERSONA ===\n${persona}\n\n${customKbInstruction}\n\n=== OUTPUT STYLE ===\n${styleInstruction}`;
+
+      // Build OpenAI messages array from Gemini-format history
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        { role: 'system', content: systemContent }
+      ];
+      for (const msg of (history || [])) {
+        const text = msg.parts?.[0]?.text || '';
+        if (text.startsWith("⚠️ LỖI") || text.startsWith("🔴 LỖI")) continue;
+        messages.push({ role: msg.role === 'model' ? 'assistant' : 'user', content: text });
+      }
+      messages.push({ role: 'user', content: prompt });
+
+      const completion = await client.chat.completions.create({
+        model: modelName,
+        messages,
+        temperature: 0.3,
+      });
+
+      res.json({
+        text: completion.choices[0]?.message?.content || "Hệ thống không phản hồi.",
+        source: 'OPENAI_DIRECT'
+      });
+
+    } catch (error: any) {
+      console.error(`OpenAI API Error:`, error);
+      let errorMsg = `Lỗi: ${error.message}`;
+      if (error.status === 429) errorMsg = "Rate limit – vui lòng thử lại sau.";
+      res.status(500).json({ text: `⚠️ LỖI HỆ THỐNG\n\n${errorMsg}`, source: 'OPENAI_DIRECT' });
     }
   });
 

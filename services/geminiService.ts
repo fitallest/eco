@@ -8,10 +8,11 @@ export const sendMessageToGemini = async (
   agentConfig?: AgentConfig,
   userLevel: 'Free' | 'Gold' | 'Enterprise' = 'Free',
   attachment?: { mimeType: string; data: string }
-): Promise<{ text: string, source: 'BACKEND' | 'GEMINI_DIRECT' }> => {
+): Promise<{ text: string, source: 'BACKEND' | 'GEMINI_DIRECT' | 'OPENAI_DIRECT' }> => {
   
   try {
-    const response = await fetch('/api/gemini', {
+    // Primary engine: OpenAI (ChatGPT)
+    const response = await fetch('/api/openai', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -30,7 +31,7 @@ export const sendMessageToGemini = async (
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
       if (errorData && errorData.text) {
-        return { text: errorData.text, source: 'GEMINI_DIRECT' };
+        return { text: errorData.text, source: 'OPENAI_DIRECT' };
       }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -42,7 +43,7 @@ export const sendMessageToGemini = async (
     console.error(`API Request Error:`, error);
     return { 
         text: `⚠️ LỖI HỆ THỐNG\n\nKhông thể kết nối đến máy chủ. Vui lòng thử lại sau.`, 
-        source: 'GEMINI_DIRECT' 
+        source: 'OPENAI_DIRECT' 
     };
   }
 };

@@ -22,9 +22,9 @@ async function startServer() {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
       // Select Model based on User Level
-      let modelName = 'gemini-2.5-flash'; 
+      let modelName = 'gemini-flash-lite-latest'; 
       if (userLevel === 'Enterprise' || userLevel === 'Gold') {
-          modelName = 'gemini-2.5-pro'; 
+          modelName = 'gemini-flash-latest'; 
       }
 
       const BASE_SYSTEM_INSTRUCTION = `

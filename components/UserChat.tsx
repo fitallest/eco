@@ -971,9 +971,9 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
             <div className="flex-1 overflow-y-auto p-3 md:p-8 space-y-4 md:space-y-6 relative" onClick={() => { if (window.innerWidth < 768 && showSidebar) setShowSidebar(false); }}>
                 {/* Render Messages in Chronological Order */}
                 {messages.map(msg => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group max-w-full overflow-x-hidden`}>
+            <div key={msg.id} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group`}>
                 {msg.role === 'model' && <div className="w-6 h-6 md:w-8 md:h-8 rounded bg-slate-900 border border-slate-700 hidden sm:flex items-center justify-center mr-2 md:mr-3 text-emerald-500 shrink-0 mt-1"><Cpu size={14}/></div>}
-                <div className={`max-w-[95%] sm:max-w-[85%] rounded-2xl p-3 md:p-6 border relative ${msg.role === 'user' ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-100 rounded-tr-sm' : 'bg-slate-900/80 border-slate-800 text-slate-200 rounded-tl-sm'} overflow-x-auto`}>
+                <div className={`min-w-0 max-w-[95%] sm:max-w-[85%] rounded-2xl p-3 md:p-6 border relative ${msg.role === 'user' ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-100 rounded-tr-sm' : 'bg-slate-900/80 border-slate-800 text-slate-200 rounded-tl-sm'} overflow-x-auto`}>
                     
                     {editingMsgId === msg.id ? (
                         <div className="flex flex-col gap-2 min-w-[280px] md:min-w-[400px]">

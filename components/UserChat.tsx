@@ -821,7 +821,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
   }
 
   return (
-    <div className="flex h-screen bg-[#020617] font-inter text-slate-200 overflow-hidden">
+    <div className="flex h-screen w-full bg-[#020617] font-inter text-slate-200 overflow-hidden">
       
       {/* MOBILE BACKDROP */}
       {showSidebar && <div className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowSidebar(false)} />}
@@ -882,10 +882,10 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
       </div>
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col h-full relative min-w-0">
+      <div className="flex-1 flex flex-col h-full relative min-w-0 w-full">
         
         {/* HEADER */}
-        <header className="h-14 md:h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-3 md:px-6 z-20 flex-shrink-0">
+        <header className="h-14 md:h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-3 md:px-6 z-20 flex-shrink-0 w-full">
              <div className="flex items-center gap-2 md:gap-3">
                  <button onClick={() => setShowSidebar(!showSidebar)} className="p-1 text-slate-400 hover:text-white transition-colors">
                     {showSidebar ? <ChevronLeft size={20}/> : <Menu size={20}/>}
@@ -925,7 +925,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
         </header>
 
         {/* CHAT AREA WITH OPTIONAL SPLIT SCREEN */}
-        <div className="flex-1 overflow-hidden flex">
+        <div className="flex-1 overflow-hidden flex w-full">
             {/* Left Pane: File Viewer (if attachment exists) */}
             {(() => {
                 const sessionAttachment = messages.find(m => m.attachment)?.attachment;
@@ -968,7 +968,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
             })()}
 
             {/* Right Pane: Chat Messages */}
-            <div className="flex-1 min-w-0 overflow-y-auto p-3 md:p-8 space-y-4 md:space-y-6 relative" onClick={() => { if (window.innerWidth < 768 && showSidebar) setShowSidebar(false); }}>
+            <div className="flex-1 min-w-0 w-full overflow-y-auto p-3 md:p-8 space-y-4 md:space-y-6 relative" onClick={() => { if (window.innerWidth < 768 && showSidebar) setShowSidebar(false); }}>
                 {/* Render Messages in Chronological Order */}
                 {messages.map(msg => (
             <div key={msg.id} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group`}>
@@ -1134,7 +1134,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
         <div ref={messagesEndRef}/>
       </div>
       </div>
-      <div className="p-2 md:p-4 bg-[#0f172a] border-t border-slate-800 shrink-0">
+      <div className="w-full p-2 md:p-4 bg-[#0f172a] border-t border-slate-800 shrink-0">
          <div className="max-w-4xl mx-auto flex gap-1.5 md:gap-2 w-full">
              <button 
                 type="button"

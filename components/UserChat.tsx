@@ -636,7 +636,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
     return (
       <div className="min-h-screen bg-[#020617] text-white flex flex-col relative font-inter overflow-y-auto">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none"></div>
-        <header className="p-6 flex justify-between items-center z-10">
+        <header className="p-4 sm:p-6 flex justify-between items-center z-10">
             {/* ... header content ... */}
             <div className="font-bold text-xl font-mono">ecolaw<span className="text-emerald-500">.ai</span></div>
             <div className="flex items-center gap-4">
@@ -657,13 +657,13 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
             </div>
         </header>
         <main className="flex-1 flex flex-col items-center justify-start pt-10 px-4 relative z-10 pb-20">
-            <div className="text-center mb-10">
-                <h1 className="text-6xl font-bold mb-4">ecolaw<span className="text-emerald-500">.ai</span></h1>
-                <p className="text-slate-400 text-lg max-w-2xl mx-auto">Hệ thống tư vấn pháp lý <span className="text-emerald-400 font-bold">Real-time</span> được hỗ trợ bởi trí tuệ nhân tạo đa tác nhân.</p>
+            <div className="text-center mb-8 md:mb-10 mt-4 md:mt-0">
+                <h1 className="text-5xl md:text-6xl font-bold mb-4">ecolaw<span className="text-emerald-500">.ai</span></h1>
+                <p className="text-slate-400 text-base md:text-lg max-w-2xl mx-auto">Hệ thống tư vấn pháp lý <span className="text-emerald-400 font-bold">Real-time</span> được hỗ trợ bởi trí tuệ nhân tạo đa tác nhân.</p>
             </div>
-            <div className="w-full max-w-2xl">
+            <div className="w-full max-w-2xl px-2 sm:px-0">
                 {/* Quick Actions for Landing Page - Moved Up */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-6">
                     <button 
                         onClick={() => setShowDraftModal(true)}
                         className="bg-slate-900/50 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 p-4 rounded-xl flex items-center justify-center gap-4 transition-all group"
@@ -733,11 +733,11 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                             value={inputText} 
                             onChange={e => setInputText(e.target.value)} 
                             placeholder={selectedFile ? "Nhập yêu cầu phân tích..." : `Hỏi ${activeLabel}...`} 
-                            className="flex-1 bg-transparent border-none text-white placeholder-slate-500 focus:ring-0 py-4 text-base font-medium"
+                            className="flex-1 min-w-0 bg-transparent border-none text-white placeholder-slate-500 focus:ring-0 py-3 md:py-4 text-base font-medium"
                         />
 
                         {/* Right Controls */}
-                        <div className="flex items-center gap-3 pr-2 pl-2">
+                        <div className="flex items-center gap-2 md:gap-3 pr-2 pl-2 shrink-0">
                             {/* Mode Toggle - Minimalist Pill */}
                             <div className="hidden sm:flex bg-slate-900/80 rounded-full p-1 border border-slate-800 items-center h-9">
                                  <button 
@@ -823,8 +823,11 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
   return (
     <div className="flex h-screen bg-[#020617] font-inter text-slate-200 overflow-hidden">
       
+      {/* MOBILE BACKDROP */}
+      {showSidebar && <div className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowSidebar(false)} />}
+      
       {/* SIDEBAR */}
-      <div className={`${showSidebar ? 'w-64' : 'w-0'} bg-slate-950 border-r border-slate-800 transition-all duration-300 flex flex-col flex-shrink-0 overflow-hidden`}>
+      <div className={`${showSidebar ? 'w-[280px] md:w-64' : 'w-0'} absolute md:relative z-50 md:z-0 h-full bg-slate-950 border-r border-slate-800 transition-all duration-300 flex flex-col flex-shrink-0 overflow-x-hidden`}>
           <div className="p-4 border-b border-slate-800 flex justify-between items-center">
               <div className="font-bold font-mono text-emerald-500 flex items-center gap-2"><Terminal size={16}/> HISTORY</div>
               <div className="flex items-center gap-1">
@@ -882,22 +885,22 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
       <div className="flex-1 flex flex-col h-full relative min-w-0">
         
         {/* HEADER */}
-        <header className="h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-4 md:px-6 z-20 flex-shrink-0">
-             <div className="flex items-center gap-3">
-                 <button onClick={() => setShowSidebar(!showSidebar)} className="text-slate-400 hover:text-white transition-colors">
+        <header className="h-14 md:h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-3 md:px-6 z-20 flex-shrink-0">
+             <div className="flex items-center gap-2 md:gap-3">
+                 <button onClick={() => setShowSidebar(!showSidebar)} className="p-1 text-slate-400 hover:text-white transition-colors">
                     {showSidebar ? <ChevronLeft size={20}/> : <Menu size={20}/>}
                  </button>
-                 <div className="font-bold text-xl font-mono cursor-pointer" onClick={() => setCurrentSessionId(null)}>ecolaw<span className="text-emerald-500">.ai</span></div>
+                 <div className="font-bold text-lg md:text-xl font-mono cursor-pointer" onClick={() => setCurrentSessionId(null)}>ecolaw<span className="text-emerald-500">.ai</span></div>
              </div>
              
-             <div className="flex items-center gap-4">
+             <div className="flex items-center gap-2 md:gap-4">
                  <div className="hidden md:flex bg-slate-900 rounded-full p-1 border border-slate-800">
                     <button onClick={() => setResponseStyle('CONCISE')} className={`px-3 py-1 rounded-full text-xs ${responseStyle === 'CONCISE' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}><Zap size={12}/> Nhanh</button>
                     <button onClick={() => setResponseStyle('DEEP')} className={`px-3 py-1 rounded-full text-xs ${responseStyle === 'DEEP' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}><BookOpen size={12}/> Sâu</button>
                  </div>
                  <div className="relative">
-                    <button onClick={() => setShowAgentMenu(!showAgentMenu)} className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-full text-sm hover:border-emerald-500 transition-colors">
-                        <ActiveIcon size={16} className="text-emerald-500"/> {activeLabel} <ChevronDown size={14}/>
+                    <button onClick={() => setShowAgentMenu(!showAgentMenu)} className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 bg-slate-900 border border-slate-700 rounded-full text-xs md:text-sm hover:border-emerald-500 transition-colors max-w-[140px] md:max-w-none truncate shrink-0">
+                        <ActiveIcon size={14} className="text-emerald-500 shrink-0"/> <span className="truncate">{activeLabel}</span> <ChevronDown size={14} className="shrink-0"/>
                     </button>
                     {showAgentMenu && (
                         <div className="absolute top-full right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-xl overflow-hidden z-30">
@@ -913,9 +916,10 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                     )}
                  </div>
                  
-                 <button onClick={() => onCommand('/admin')} className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors" title="Admin Dashboard"><LayoutGrid size={20}/></button>
-                 <button onClick={() => onTriggerUpgrade('SUBSCRIPTION')} className="bg-emerald-900/30 text-emerald-400 text-xs px-3 py-1.5 rounded-lg border border-emerald-500/30 hover:bg-emerald-900/50 transition-colors font-mono font-bold">
-                     UPGRADE
+                 <button onClick={() => onCommand('/admin')} className="hidden sm:block text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors" title="Admin Dashboard"><LayoutGrid size={18}/></button>
+                 <button onClick={() => onTriggerUpgrade('SUBSCRIPTION')} className="bg-emerald-900/30 text-emerald-400 text-[10px] md:text-xs px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-emerald-500/30 hover:bg-emerald-900/50 transition-colors font-mono font-bold whitespace-nowrap">
+                     <span className="hidden sm:inline">UPGRADE</span>
+                     <span className="sm:hidden">NẠP</span>
                  </button>
              </div>
         </header>
@@ -964,12 +968,12 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
             })()}
 
             {/* Right Pane: Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 relative">
+            <div className="flex-1 overflow-y-auto p-3 md:p-8 space-y-4 md:space-y-6 relative" onClick={() => { if (window.innerWidth < 768 && showSidebar) setShowSidebar(false); }}>
                 {/* Render Messages in Chronological Order */}
                 {messages.map(msg => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group`}>
-                {msg.role === 'model' && <div className="w-8 h-8 rounded bg-slate-900 border border-slate-700 flex items-center justify-center mr-3 text-emerald-500"><Cpu size={18}/></div>}
-                <div className={`max-w-[85%] rounded-2xl p-4 md:p-6 border relative ${msg.role === 'user' ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-100 rounded-tr-sm' : 'bg-slate-900/80 border-slate-800 text-slate-200 rounded-tl-sm'}`}>
+            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group max-w-full overflow-x-hidden`}>
+                {msg.role === 'model' && <div className="w-6 h-6 md:w-8 md:h-8 rounded bg-slate-900 border border-slate-700 hidden sm:flex items-center justify-center mr-2 md:mr-3 text-emerald-500 shrink-0 mt-1"><Cpu size={14}/></div>}
+                <div className={`max-w-[95%] sm:max-w-[85%] rounded-2xl p-3 md:p-6 border relative ${msg.role === 'user' ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-100 rounded-tr-sm' : 'bg-slate-900/80 border-slate-800 text-slate-200 rounded-tl-sm'} overflow-x-auto`}>
                     
                     {editingMsgId === msg.id ? (
                         <div className="flex flex-col gap-2 min-w-[280px] md:min-w-[400px]">
@@ -1130,26 +1134,26 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
         <div ref={messagesEndRef}/>
       </div>
       </div>
-      <div className="p-4 bg-[#0f172a] border-t border-slate-800 shrink-0">
-         <div className="max-w-4xl mx-auto flex gap-2">
+      <div className="p-2 md:p-4 bg-[#0f172a] border-t border-slate-800 shrink-0">
+         <div className="max-w-4xl mx-auto flex gap-1.5 md:gap-2 w-full">
              <button 
                 type="button"
                 onClick={() => setShowDraftModal(true)}
-                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-3 rounded-xl flex flex-col items-center justify-center transition-all group shrink-0"
+                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-2 py-1 md:py-0 md:px-3 rounded-xl flex flex-col items-center justify-center transition-all group shrink-0"
                 title="Soạn thảo văn bản pháp lý"
              >
-                <FileText size={20} className="group-hover:text-emerald-400 mb-0.5"/>
-                <span className="text-[9px] font-bold uppercase group-hover:text-emerald-400">Soạn Đơn</span>
+                <FileText size={18} className="group-hover:text-emerald-400 mb-0.5 md:w-5 md:h-5"/>
+                <span className="text-[8px] md:text-[9px] font-bold uppercase group-hover:text-emerald-400">Soạn Đơn</span>
              </button>
              
              <button 
                 type="button"
                 onClick={() => setShowToolsModal(true)}
-                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-3 rounded-xl flex flex-col items-center justify-center transition-all group shrink-0"
+                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-2 py-1 md:py-0 md:px-3 rounded-xl flex flex-col items-center justify-center transition-all group shrink-0"
                 title="Tiện ích pháp lý mở rộng"
              >
-                <LayoutGrid size={20} className="group-hover:text-blue-400 mb-0.5"/>
-                <span className="text-[9px] font-bold uppercase group-hover:text-blue-400">Tiện Ích</span>
+                <LayoutGrid size={18} className="group-hover:text-blue-400 mb-0.5 md:w-5 md:h-5"/>
+                <span className="text-[8px] md:text-[9px] font-bold uppercase group-hover:text-blue-400">Tiện Ích</span>
              </button>
 
              <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex-1 relative group">
@@ -1175,30 +1179,29 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                     onChange={handleFileSelect} 
                 />
                 
-                <div className="relative flex items-center w-full bg-[#1e293b] border border-slate-700 rounded-2xl shadow-lg transition-all focus-within:border-emerald-500/50 focus-within:ring-1 focus-within:ring-emerald-500/50">
+                <div className="relative flex items-center w-full bg-[#1e293b] border border-slate-700 rounded-[1.25rem] shadow-lg transition-all focus-within:border-emerald-500/50 focus-within:ring-1 focus-within:ring-emerald-500/50">
                     {/* Attachment Button */}
                     <button 
                         type="button" 
                         onClick={() => fileInputRef.current?.click()} 
-                        className="pl-4 pr-3 py-3 text-slate-400 hover:text-emerald-400 transition-colors"
+                        className="pl-3 pr-2 md:pl-4 md:pr-3 py-2 md:py-3 text-slate-400 hover:text-emerald-400 transition-colors shrink-0"
                         title="Tải lên tài liệu"
                     >
-                        <Paperclip size={20} />
+                        <Paperclip size={18} className="md:w-5 md:h-5"/>
                     </button>
 
                     {/* Input Field */}
                     <input 
                         ref={inputRef} 
-                        autoFocus 
                         type="text" 
                         value={inputText} 
                         onChange={e => setInputText(e.target.value)} 
-                        placeholder={selectedFile ? "Nhập yêu cầu phân tích..." : `[${activeLabel}] Nhập câu hỏi chi tiết...`} 
-                        className="flex-1 bg-transparent border-none text-white placeholder-slate-500 focus:ring-0 py-3 text-sm font-medium"
+                        placeholder={selectedFile ? "Nhập chi tiết..." : `Hỏi ${activeLabel}...`} 
+                        className="flex-1 min-w-0 bg-transparent border-none text-white placeholder-slate-500 focus:ring-0 py-2.5 md:py-3 text-[13px] md:text-sm font-medium"
                     />
 
                     {/* Right Controls */}
-                    <div className="flex items-center gap-2 pr-2 pl-2">
+                    <div className="flex items-center gap-1 md:gap-2 pr-1.5 md:pr-2 pl-1 md:pl-2 shrink-0">
                         {/* Mode Toggle - Minimalist Pill */}
                         <div className="hidden sm:flex bg-slate-900/80 rounded-full p-1 border border-slate-800 items-center h-8">
                              <button 

@@ -66,16 +66,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({ lawyer, isOpen, onCl
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in font-inter">
-      <div className="bg-slate-900 w-full max-w-4xl rounded-2xl border border-slate-700 shadow-2xl flex flex-col md:flex-row overflow-hidden max-h-[90vh]">
+      <div className="bg-slate-900 w-full max-w-4xl rounded-2xl border border-slate-700 shadow-2xl flex flex-col md:flex-row overflow-hidden max-h-[92vh]">
         
         {/* Left: Lawyer Info */}
-        <div className="w-full md:w-1/3 bg-slate-950 p-6 border-r border-slate-800 flex flex-col items-center text-center md:text-left">
-            <div className="relative mb-4">
-                <img src={lawyer.avatarUrl} alt={lawyer.name} className="w-24 h-24 rounded-full object-cover border-2 border-slate-700" />
-                <div className="absolute bottom-0 right-0 w-5 h-5 bg-emerald-500 border-4 border-slate-950 rounded-full"></div>
+        <div className="w-full md:w-1/3 bg-slate-950 p-4 md:p-6 border-b md:border-b-0 md:border-r border-slate-800 flex flex-row md:flex-col items-center md:items-center gap-4 md:gap-0 md:text-center">
+            <div className="relative shrink-0">
+                <img src={lawyer.avatarUrl} alt={lawyer.name} className="w-16 h-16 md:w-24 md:h-24 rounded-full object-cover border-2 border-slate-700" />
+                <div className="absolute bottom-0 right-0 w-4 h-4 md:w-5 md:h-5 bg-emerald-500 border-3 md:border-4 border-slate-950 rounded-full"></div>
             </div>
-            <h2 className="text-xl font-bold text-white mb-1">{lawyer.name}</h2>
-            <p className="text-emerald-400 text-sm font-medium mb-3">{lawyer.title}</p>
+            <div className="flex-1 md:flex-initial">
+            <h2 className="text-base md:text-xl font-bold text-white mb-0.5 md:mb-1">{lawyer.name}</h2>
+            <p className="text-emerald-400 text-xs md:text-sm font-medium mb-1 md:mb-3">{lawyer.title}</p>
             
             <div className="flex items-center gap-4 text-xs text-slate-400 mb-6 bg-slate-900 px-4 py-2 rounded-lg border border-slate-800">
                 <div className="flex items-center gap-1"><Star size={12} className="text-yellow-500 fill-current"/> {lawyer.rating}</div>
@@ -83,9 +84,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ lawyer, isOpen, onCl
                 <div className="flex items-center gap-1"><User size={12}/> {lawyer.experience} KN</div>
             </div>
 
-            <div className="mt-auto w-full pt-6 border-t border-slate-800">
+            <div className="mt-2 md:mt-auto w-full pt-3 md:pt-6 border-t border-slate-800 hidden md:block">
                 <div className="text-slate-500 text-xs uppercase font-bold mb-1">Phí tư vấn (1 giờ)</div>
                 <div className="text-2xl font-mono text-white font-bold">{lawyer.consultationFee.toLocaleString('vi-VN')} ₫</div>
+            </div>
             </div>
         </div>
 
@@ -121,7 +123,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ lawyer, isOpen, onCl
                         Vui lòng chọn ngày trước
                     </div>
                 ) : (
-                    <div className="grid grid-cols-4 gap-3 animate-fade-in">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 md:gap-3 animate-fade-in">
                         {timeSlots.map(time => (
                             <button
                                 key={time}

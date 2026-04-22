@@ -97,10 +97,11 @@ export const NewsSection: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Mobile: horizontal scroll, Desktop: grid */}
+      <div className="flex md:grid md:grid-cols-3 gap-4 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 -mx-2 px-2 md:mx-0 md:px-0">
         {filteredNews.map((news) => (
-          <div key={news.id} className="group bg-slate-900/50 border border-slate-800 hover:border-emerald-500/30 rounded-xl overflow-hidden transition-all hover:bg-slate-900 cursor-pointer">
-            <div className="h-32 overflow-hidden relative">
+          <div key={news.id} className="group bg-slate-900/50 border border-slate-800 hover:border-emerald-500/30 rounded-xl overflow-hidden transition-all hover:bg-slate-900 cursor-pointer flex-shrink-0 w-[280px] md:w-auto">
+            <div className="h-28 md:h-32 overflow-hidden relative">
               <img 
                 src={news.imageUrl} 
                 alt={news.title} 
@@ -111,7 +112,7 @@ export const NewsSection: React.FC = () => {
                 <Clock size={10} /> {news.time}
               </div>
             </div>
-            <div className="p-4">
+            <div className="p-3 md:p-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-[10px] font-bold text-emerald-500 bg-emerald-950/30 px-1.5 py-0.5 rounded border border-emerald-900/50">{news.source}</span>
                 {news.category === 'INTERNATIONAL' && <span className="text-[10px] text-slate-500 flex items-center gap-0.5"><Globe size={10}/> Global</span>}
@@ -119,7 +120,7 @@ export const NewsSection: React.FC = () => {
               <h3 className="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition-colors line-clamp-2 mb-2 leading-snug">
                 {news.title}
               </h3>
-              <p className="text-xs text-slate-500 line-clamp-2 mb-3">
+              <p className="text-xs text-slate-500 line-clamp-2 mb-2 md:mb-3">
                 {news.summary}
               </p>
               <div className="flex items-center text-[10px] text-slate-600 group-hover:text-slate-400 transition-colors">

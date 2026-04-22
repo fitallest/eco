@@ -19,13 +19,13 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ onAccept }) =>
       <div className="bg-slate-900 w-full max-w-2xl rounded-2xl border border-slate-700 shadow-2xl flex flex-col max-h-[90vh] relative overflow-hidden">
         
         {/* Header */}
-        <div className="p-6 border-b border-slate-800 bg-slate-950 flex items-center gap-4">
-          <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-xl text-red-500">
-            <ShieldAlert size={32} />
+        <div className="p-4 md:p-6 border-b border-slate-800 bg-slate-950 flex items-center gap-3 md:gap-4">
+          <div className="p-2 md:p-3 bg-red-900/20 border border-red-500/30 rounded-xl text-red-500 shrink-0">
+            <ShieldAlert size={24} className="md:w-8 md:h-8" />
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-white uppercase tracking-wide">Tuyên bố miễn trừ trách nhiệm</h1>
-            <p className="text-sm text-slate-400">Vui lòng đọc kỹ và xác nhận trước khi sử dụng hệ thống ECOLAW.AI</p>
+          <div className="min-w-0">
+            <h1 className="text-base md:text-xl font-bold text-white uppercase tracking-wide">Tuyên bố miễn trừ trách nhiệm</h1>
+            <p className="text-xs md:text-sm text-slate-400">Vui lòng đọc kỹ và xác nhận trước khi sử dụng hệ thống ECOLAW.AI</p>
           </div>
         </div>
 

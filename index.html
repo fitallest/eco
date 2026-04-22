@@ -2,23 +2,62 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>ECOLAW.AI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#020617" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>ECOLAW.AI - Tư vấn Pháp lý AI</title>
+    <meta name="description" content="Hệ thống tư vấn pháp lý Real-time được hỗ trợ bởi trí tuệ nhân tạo đa tác nhân." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+      *, *::before, *::after {
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+      }
+
+      html {
+        -webkit-text-size-adjust: 100%;
+        height: -webkit-fill-available;
+        height: 100%;
+      }
+
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #020617; /* slate-950 */
-        color: #e2e8f0; /* slate-200 */
+        background-color: #020617;
+        color: #e2e8f0;
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+        padding-top: env(safe-area-inset-top);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
       }
-      /* Custom Scrollbar for Dark Mode */
+
+      #root {
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+      }
+
+      /* Prevent iOS input zoom - inputs must be >= 16px */
+      input, select, textarea {
+        font-size: 16px !important;
+      }
+      @media (min-width: 768px) {
+        input, select, textarea {
+          font-size: inherit !important;
+        }
+      }
+
+      /* Custom Scrollbar for Desktop */
       ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
       }
       ::-webkit-scrollbar-track {
         background: #0f172a; 
@@ -30,7 +69,24 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #475569; 
       }
-      
+
+      /* Hide scrollbar on mobile for cleaner look */
+      @media (max-width: 767px) {
+        ::-webkit-scrollbar {
+          width: 0;
+          height: 0;
+          display: none;
+        }
+        * {
+          scrollbar-width: none;
+        }
+      }
+
+      /* Safe area bottom padding utility */
+      .safe-bottom {
+        padding-bottom: max(env(safe-area-inset-bottom), 8px);
+      }
+
       .markdown-body ul {
         list-style-type: disc;
         padding-left: 1.5rem;
@@ -42,10 +98,10 @@
       }
       .markdown-body strong {
         font-weight: 600;
-        color: #34d399; /* emerald-400 */
+        color: #34d399;
       }
       .markdown-body h3 {
-        color: #34d399; /* emerald-400 */
+        color: #34d399;
         font-weight: 700;
         margin-top: 1.5rem;
         margin-bottom: 0.75rem;
@@ -54,20 +110,14 @@
         letter-spacing: 0.05em;
       }
       .markdown-body hr {
-        border-color: #1e293b; /* slate-800 */
+        border-color: #1e293b;
         margin: 1.5rem 0;
       }
 
       /* Animations */
       @keyframes fadeInUp {
-        from {
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
       }
       .animate-fade-in-up {
         animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -96,6 +146,16 @@
       }
       .animate-fade-in {
         animation: fadeIn 0.2s ease-in-out forwards;
+      }
+
+      /* Mobile-optimized horizontal scroll */
+      .mobile-scroll-x {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x mandatory;
+      }
+      .mobile-scroll-x > * {
+        scroll-snap-align: start;
       }
   </style>
 </head>

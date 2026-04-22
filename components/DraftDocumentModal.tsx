@@ -89,7 +89,7 @@ export const DraftDocumentModal: React.FC<DraftDocumentModalProps> = ({
                     </div>
                 </div>
             ) : (
-                <div className="p-6 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                     {LEGAL_DOCUMENTS.map((doc) => {
                         const Icon = doc.icon;
                         const canAfford = userCredits >= doc.price || userLevel === 'Enterprise';

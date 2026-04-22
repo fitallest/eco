@@ -634,7 +634,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
 
   if (isLanding) {
     return (
-      <div className="min-h-screen bg-[#020617] text-white flex flex-col relative font-inter overflow-y-auto">
+      <div className="min-h-[100dvh] bg-[#020617] text-white flex flex-col relative font-inter overflow-y-auto">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none"></div>
         <header className="p-4 sm:p-6 flex justify-between items-center z-10">
             {/* ... header content ... */}
@@ -657,9 +657,9 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
             </div>
         </header>
         <main className="flex-1 flex flex-col items-center justify-start pt-10 px-4 relative z-10 pb-20">
-            <div className="text-center mb-8 md:mb-10 mt-4 md:mt-0">
-                <h1 className="text-5xl md:text-6xl font-bold mb-4">ecolaw<span className="text-emerald-500">.ai</span></h1>
-                <p className="text-slate-400 text-base md:text-lg max-w-2xl mx-auto">Hệ thống tư vấn pháp lý <span className="text-emerald-400 font-bold">Real-time</span> được hỗ trợ bởi trí tuệ nhân tạo đa tác nhân.</p>
+            <div className="text-center mb-6 md:mb-10 mt-2 md:mt-0">
+                <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-3 md:mb-4">ecolaw<span className="text-emerald-500">.ai</span></h1>
+                <p className="text-slate-400 text-sm md:text-base lg:text-lg max-w-2xl mx-auto px-2">Hệ thống tư vấn pháp lý <span className="text-emerald-400 font-bold">Real-time</span> được hỗ trợ bởi trí tuệ nhân tạo đa tác nhân.</p>
             </div>
             <div className="w-full max-w-2xl px-2 sm:px-0">
                 {/* Quick Actions for Landing Page - Moved Up */}
@@ -693,16 +693,16 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
 
                 <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="relative w-full max-w-3xl mx-auto group z-20">
                     {selectedFile && (
-                        <div className="absolute bottom-full left-0 mb-3 bg-[#1e293b] border border-slate-700 rounded-xl p-3 flex items-center gap-3 shadow-xl animate-in fade-in slide-in-from-bottom-2 w-full max-w-sm">
-                            <div className="bg-red-500/20 p-2 rounded-lg text-red-500 shrink-0">
-                                <FileText size={20} />
+                        <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#1e293b] border border-slate-700 rounded-xl p-2.5 flex items-center gap-2.5 shadow-xl">
+                            <div className="bg-red-500/20 p-1.5 rounded-lg text-red-500 shrink-0">
+                                <FileText size={16} />
                             </div>
                             <div className="flex flex-col min-w-0 flex-1">
-                                <span className="text-sm font-bold text-slate-200 truncate">{selectedFile.name}</span>
+                                <span className="text-xs font-bold text-slate-200 truncate">{selectedFile.name}</span>
                                 <span className="text-[10px] text-slate-500 uppercase font-mono">{selectedFile.type.split('/')[1]} • {(selectedFile.data.length * 0.75 / 1024).toFixed(1)} KB</span>
                             </div>
                             <button type="button" onClick={clearSelectedFile} className="p-1.5 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors shrink-0">
-                                <X size={16} />
+                                <X size={14} />
                             </button>
                         </div>
                     )}
@@ -719,10 +719,10 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                         <button 
                             type="button" 
                             onClick={() => fileInputRef.current?.click()} 
-                            className="pl-4 pr-3 py-4 text-slate-400 hover:text-emerald-400 transition-colors"
+                            className="pl-4 pr-2 py-3.5 text-slate-400 hover:text-emerald-400 transition-colors shrink-0"
                             title="Tải lên tài liệu"
                         >
-                            <Paperclip size={22} />
+                            <Paperclip size={20} />
                         </button>
 
                         {/* Input Field */}
@@ -733,12 +733,12 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                             value={inputText} 
                             onChange={e => setInputText(e.target.value)} 
                             placeholder={selectedFile ? "Nhập yêu cầu phân tích..." : `Hỏi ${activeLabel}...`} 
-                            className="flex-1 min-w-0 bg-transparent border-none text-white placeholder-slate-500 focus:ring-0 py-3 md:py-4 text-base font-medium"
+                            className="flex-1 min-w-0 bg-transparent border-none text-white placeholder-slate-500 focus:ring-0 py-3 md:py-3.5 text-base font-medium"
                         />
 
                         {/* Right Controls */}
-                        <div className="flex items-center gap-2 md:gap-3 pr-2 pl-2 shrink-0">
-                            {/* Mode Toggle - Minimalist Pill */}
+                        <div className="flex items-center gap-2 pr-2 shrink-0">
+                            {/* Mode Toggle - Desktop */}
                             <div className="hidden sm:flex bg-slate-900/80 rounded-full p-1 border border-slate-800 items-center h-9">
                                  <button 
                                     type="button" 
@@ -756,13 +756,13 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                                  </button>
                             </div>
 
-                            {/* Action Button - Circular */}
+                            {/* Action Button */}
                             {!inputText && !selectedFile ? (
-                                 <button type="button" onClick={() => alert("Tính năng nhập liệu bằng giọng nói đang được phát triển.")} className="w-10 h-10 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-all border border-slate-700 group">
-                                    <Mic size={20} className="group-hover:scale-110 transition-transform"/>
+                                 <button type="button" onClick={() => alert("Tính năng nhập liệu bằng giọng nói đang được phát triển.")} className="w-10 h-10 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-all border border-slate-700">
+                                    <Mic size={18}/>
                                  </button>
                             ) : (
-                                <button type="submit" className="w-10 h-10 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full flex items-center justify-center transition-all shadow-lg shadow-emerald-900/20 hover:shadow-emerald-900/40 hover:scale-105 active:scale-95">
+                                <button type="submit" className="w-10 h-10 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full flex items-center justify-center transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
                                     <ArrowUp size={20} strokeWidth={3}/>
                                 </button>
                             )}
@@ -784,12 +784,12 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                         "Luật Căn cước & VNeID mới nhất",
                         "Quyền nuôi con khi ly hôn"
                     ].map((t, i) => (
-                        <button key={i} onClick={() => handleSendMessage(t)} className="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/50 text-slate-400 text-xs hover:border-emerald-500/30 hover:text-emerald-400 transition-colors">{t}</button>
+                        <button key={i} onClick={() => handleSendMessage(t)} className="px-3.5 py-2 rounded-xl border border-slate-800 bg-slate-900/50 text-slate-400 text-xs hover:border-emerald-500/30 hover:text-emerald-400 transition-colors min-h-[40px]">{t}</button>
                     ))}
                 </div>
                 <div className="mt-8 flex flex-wrap justify-center gap-2">
                      {AGENTS_LIST.filter(a => a.id !== 'GENERAL').map(a => { const Icon = a.icon; return (
-                         <button key={a.id} onClick={() => setSelectedAgent(a.id)} className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs transition-all ${selectedAgent === a.id ? 'bg-slate-800 border-emerald-500 text-emerald-400' : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-600'}`}><Icon size={14}/> {a.label}</button>
+                         <button key={a.id} onClick={() => setSelectedAgent(a.id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-full border text-xs transition-all min-h-[40px] ${selectedAgent === a.id ? 'bg-slate-800 border-emerald-500 text-emerald-400' : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-600'}`}><Icon size={14}/> {a.label}</button>
                      )})}
                 </div>
             </div>
@@ -821,13 +821,13 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#020617] font-inter text-slate-200 overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-[#020617] font-inter text-slate-200 overflow-hidden">
       
       {/* MOBILE BACKDROP */}
-      {showSidebar && <div className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowSidebar(false)} />}
+      {showSidebar && <div className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={() => setShowSidebar(false)} />}
       
       {/* SIDEBAR */}
-      <div className={`${showSidebar ? 'w-[280px] md:w-64' : 'w-0'} absolute md:relative z-50 md:z-0 h-full bg-slate-950 border-r border-slate-800 transition-all duration-300 flex flex-col flex-shrink-0 overflow-x-hidden`}>
+      <div className={`${showSidebar ? 'w-[280px] md:w-64' : 'w-0'} fixed md:relative left-0 top-0 z-50 md:z-0 h-full bg-slate-950 border-r border-slate-800 transition-all duration-300 flex flex-col flex-shrink-0 overflow-x-hidden`}>
           <div className="p-4 border-b border-slate-800 flex justify-between items-center">
               <div className="font-bold font-mono text-emerald-500 flex items-center gap-2"><Terminal size={16}/> HISTORY</div>
               <div className="flex items-center gap-1">
@@ -885,27 +885,31 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
       <div className="flex-1 flex flex-col h-full relative min-w-0 w-full">
         
         {/* HEADER */}
-        <header className="h-14 md:h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-3 md:px-6 z-20 flex-shrink-0 w-full">
-             <div className="flex items-center gap-2 md:gap-3">
-                 <button onClick={() => setShowSidebar(!showSidebar)} className="p-1 text-slate-400 hover:text-white transition-colors">
-                    {showSidebar ? <ChevronLeft size={20}/> : <Menu size={20}/>}
+        <header className="h-12 md:h-14 border-b border-slate-800 bg-slate-950/95 backdrop-blur-sm flex items-center justify-between px-2.5 md:px-5 z-20 flex-shrink-0 w-full">
+             <div className="flex items-center gap-1.5 md:gap-3 min-w-0">
+                 <button onClick={() => setShowSidebar(!showSidebar)} className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800 shrink-0">
+                    {showSidebar ? <ChevronLeft size={18}/> : <Menu size={18}/>}
                  </button>
-                 <div className="font-bold text-lg md:text-xl font-mono cursor-pointer" onClick={() => setCurrentSessionId(null)}>ecolaw<span className="text-emerald-500">.ai</span></div>
+                 <div className="font-bold text-sm md:text-lg font-mono cursor-pointer shrink-0" onClick={() => setCurrentSessionId(null)}>eco<span className="text-emerald-500">.ai</span></div>
              </div>
              
-             <div className="flex items-center gap-2 md:gap-4">
+             <div className="flex items-center gap-1.5 md:gap-3">
                  <div className="hidden md:flex bg-slate-900 rounded-full p-1 border border-slate-800">
                     <button onClick={() => setResponseStyle('CONCISE')} className={`px-3 py-1 rounded-full text-xs ${responseStyle === 'CONCISE' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}><Zap size={12}/> Nhanh</button>
                     <button onClick={() => setResponseStyle('DEEP')} className={`px-3 py-1 rounded-full text-xs ${responseStyle === 'DEEP' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}><BookOpen size={12}/> Sâu</button>
                  </div>
                  <div className="relative">
-                    <button onClick={() => setShowAgentMenu(!showAgentMenu)} className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 bg-slate-900 border border-slate-700 rounded-full text-xs md:text-sm hover:border-emerald-500 transition-colors max-w-[140px] md:max-w-none truncate shrink-0">
-                        <ActiveIcon size={14} className="text-emerald-500 shrink-0"/> <span className="truncate">{activeLabel}</span> <ChevronDown size={14} className="shrink-0"/>
+                    <button onClick={() => setShowAgentMenu(!showAgentMenu)} className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-1.5 bg-slate-900 border border-slate-700 rounded-full text-xs hover:border-emerald-500 transition-colors shrink-0 min-h-[36px]">
+                        <ActiveIcon size={14} className="text-emerald-500 shrink-0"/>
+                        <span className="hidden sm:inline truncate max-w-[100px] md:max-w-none">{activeLabel}</span>
+                        <ChevronDown size={12} className="shrink-0 text-slate-400"/>
                     </button>
                     {showAgentMenu && (
-                        <div className="absolute top-full right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-xl overflow-hidden z-30">
+                        <>
+                        <div className="fixed inset-0 z-20" onClick={() => setShowAgentMenu(false)} />
+                        <div className="absolute top-full right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-30">
                             {AGENTS_LIST.map(a => (
-                                <button key={a.id} onClick={() => {setSelectedAgent(a.id); setShowAgentMenu(false)}} className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-800 flex items-center justify-between ${selectedAgent === a.id ? 'text-emerald-400' : 'text-slate-300'}`}>
+                                <button key={a.id} onClick={() => {setSelectedAgent(a.id); setShowAgentMenu(false)}} className={`w-full text-left px-4 py-3 md:py-2.5 text-sm hover:bg-slate-800 flex items-center justify-between min-h-[44px] ${selectedAgent === a.id ? 'text-emerald-400' : 'text-slate-300'}`}>
                                     <div className="flex items-center gap-2">
                                         <a.icon size={16}/> {a.label}
                                     </div>
@@ -913,11 +917,12 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                                 </button>
                             ))}
                         </div>
+                        </>
                     )}
                  </div>
                  
-                 <button onClick={() => onCommand('/admin')} className="hidden sm:block text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors" title="Admin Dashboard"><LayoutGrid size={18}/></button>
-                 <button onClick={() => onTriggerUpgrade('SUBSCRIPTION')} className="bg-emerald-900/30 text-emerald-400 text-[10px] md:text-xs px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-emerald-500/30 hover:bg-emerald-900/50 transition-colors font-mono font-bold whitespace-nowrap">
+                 <button onClick={() => onCommand('/admin')} className="hidden md:block text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors" title="Admin Dashboard"><LayoutGrid size={18}/></button>
+                 <button onClick={() => onTriggerUpgrade('SUBSCRIPTION')} className="bg-emerald-900/30 text-emerald-400 text-[10px] md:text-xs px-2 py-1.5 md:px-3 md:py-1.5 rounded-lg border border-emerald-500/30 hover:bg-emerald-900/50 transition-colors font-mono font-bold whitespace-nowrap min-h-[32px]">
                      <span className="hidden sm:inline">UPGRADE</span>
                      <span className="sm:hidden">NẠP</span>
                  </button>
@@ -968,15 +973,15 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
             })()}
 
             {/* Right Pane: Chat Messages */}
-            <div className="flex-1 min-w-0 w-full overflow-y-auto p-3 md:p-8 space-y-4 md:space-y-6 relative" onClick={() => { if (window.innerWidth < 768 && showSidebar) setShowSidebar(false); }}>
+            <div className="flex-1 min-w-0 w-full overflow-y-auto px-3 py-3 md:px-8 md:py-6 space-y-3 md:space-y-5 relative" onClick={() => { if (window.innerWidth < 768 && showSidebar) setShowSidebar(false); }}>
                 {/* Render Messages in Chronological Order */}
                 {messages.map(msg => (
             <div key={msg.id} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group`}>
                 {msg.role === 'model' && <div className="w-6 h-6 md:w-8 md:h-8 rounded bg-slate-900 border border-slate-700 hidden sm:flex items-center justify-center mr-2 md:mr-3 text-emerald-500 shrink-0 mt-1"><Cpu size={14}/></div>}
-                <div className={`min-w-0 max-w-[95%] sm:max-w-[85%] rounded-2xl p-3 md:p-6 border relative ${msg.role === 'user' ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-100 rounded-tr-sm' : 'bg-slate-900/80 border-slate-800 text-slate-200 rounded-tl-sm'} break-words`}>
+                <div className={`min-w-0 max-w-[90%] sm:max-w-[85%] md:max-w-[80%] rounded-2xl px-3.5 py-3 md:px-5 md:py-4 border relative ${msg.role === 'user' ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-100 rounded-tr-sm' : 'bg-slate-900/80 border-slate-800 text-slate-200 rounded-tl-sm'} break-words overflow-hidden`}>
                     
                     {editingMsgId === msg.id ? (
-                        <div className="flex flex-col gap-2 min-w-[280px] md:min-w-[400px]">
+                        <div className="flex flex-col gap-2 w-full min-w-0 md:min-w-[400px]">
                             <textarea 
                                 value={editTempText} 
                                 onChange={e => setEditTempText(e.target.value)}
@@ -1055,10 +1060,10 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                             {msg.role === 'user' && (
                                 <button 
                                     onClick={() => startEditing(msg)}
-                                    className="absolute -left-10 top-2 p-2 text-slate-600 hover:text-emerald-400 opacity-0 group-hover:opacity-100 transition-all bg-slate-900/50 rounded-full"
+                                    className="absolute top-2 right-2 md:-left-10 md:right-auto md:top-2 p-1.5 text-emerald-300/40 hover:text-emerald-400 md:opacity-0 md:group-hover:opacity-100 transition-all bg-slate-900/30 md:bg-slate-900/50 rounded-full"
                                     title="Chỉnh sửa tin nhắn"
                                 >
-                                    <Edit2 size={14}/>
+                                    <Edit2 size={12}/>
                                 </button>
                             )}
                             
@@ -1134,40 +1139,40 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
         <div ref={messagesEndRef}/>
       </div>
       </div>
-      <div className="w-full p-2 md:p-4 bg-[#0f172a] border-t border-slate-800 shrink-0">
-         <div className="max-w-4xl mx-auto flex gap-1.5 md:gap-2 w-full">
+      <div className="w-full px-2 py-2 md:px-4 md:py-3 bg-[#0f172a]/95 backdrop-blur-sm border-t border-slate-800 shrink-0 safe-bottom">
+         <div className="max-w-4xl mx-auto flex gap-1.5 md:gap-2 w-full items-end">
              <button 
                 type="button"
                 onClick={() => setShowDraftModal(true)}
-                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-2 py-2 md:py-0 md:px-3 rounded-xl flex flex-col items-center justify-center transition-all shrink-0 min-w-[50px] md:min-w-0"
+                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white p-2.5 md:px-3 md:py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shrink-0"
                 title="Soạn thảo văn bản pháp lý"
              >
-                <FileText size={18} className="mb-0.5 md:w-5 md:h-5"/>
-                <span className="text-[9px] font-bold uppercase">Soạn Đơn</span>
+                <FileText size={16}/>
+                <span className="hidden md:inline text-[10px] font-bold uppercase">Soạn Đơn</span>
              </button>
              
              <button 
                 type="button"
                 onClick={() => setShowToolsModal(true)}
-                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-2 py-2 md:py-0 md:px-3 rounded-xl flex flex-col items-center justify-center transition-all shrink-0 min-w-[50px] md:min-w-0"
+                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white p-2.5 md:px-3 md:py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shrink-0"
                 title="Tiện ích pháp lý mở rộng"
              >
-                <LayoutGrid size={18} className="mb-0.5 md:w-5 md:h-5"/>
-                <span className="text-[9px] font-bold uppercase">Tiện Ích</span>
+                <LayoutGrid size={16}/>
+                <span className="hidden md:inline text-[10px] font-bold uppercase">Tiện Ích</span>
              </button>
 
-             <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex-1 relative group">
+             <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex-1 relative group min-w-0">
                 {selectedFile && (
-                    <div className="absolute bottom-full left-0 mb-3 bg-[#1e293b] border border-slate-700 rounded-xl p-3 flex items-center gap-3 shadow-xl animate-in fade-in slide-in-from-bottom-2 w-full max-w-sm">
-                        <div className="bg-red-500/20 p-2 rounded-lg text-red-500 shrink-0">
-                            <FileText size={20} />
+                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#1e293b] border border-slate-700 rounded-xl p-2.5 flex items-center gap-2.5 shadow-xl">
+                        <div className="bg-red-500/20 p-1.5 rounded-lg text-red-500 shrink-0">
+                            <FileText size={16} />
                         </div>
                         <div className="flex flex-col min-w-0 flex-1">
-                            <span className="text-sm font-bold text-slate-200 truncate">{selectedFile.name}</span>
+                            <span className="text-xs font-bold text-slate-200 truncate">{selectedFile.name}</span>
                             <span className="text-[10px] text-slate-500 uppercase font-mono">{selectedFile.type.split('/')[1]} • {(selectedFile.data.length * 0.75 / 1024).toFixed(1)} KB</span>
                         </div>
                         <button type="button" onClick={clearSelectedFile} className="p-1.5 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors shrink-0">
-                            <X size={16} />
+                            <X size={14} />
                         </button>
                     </div>
                 )}
@@ -1179,15 +1184,15 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                     onChange={handleFileSelect} 
                 />
                 
-                <div className="relative flex items-center w-full bg-[#1e293b] border border-slate-700 rounded-[1.25rem] shadow-lg transition-all focus-within:border-emerald-500/50 focus-within:ring-1 focus-within:ring-emerald-500/50">
+                <div className="relative flex items-center w-full bg-[#1e293b] border border-slate-700 rounded-2xl shadow-lg transition-all focus-within:border-emerald-500/50 focus-within:ring-1 focus-within:ring-emerald-500/50">
                     {/* Attachment Button */}
                     <button 
                         type="button" 
                         onClick={() => fileInputRef.current?.click()} 
-                        className="pl-3 pr-2 md:pl-4 md:pr-3 py-2 md:py-3 text-slate-400 hover:text-emerald-400 transition-colors shrink-0"
+                        className="pl-3 pr-1.5 md:pl-4 md:pr-2 py-2.5 text-slate-400 hover:text-emerald-400 transition-colors shrink-0"
                         title="Tải lên tài liệu"
                     >
-                        <Paperclip size={18} className="md:w-5 md:h-5"/>
+                        <Paperclip size={18}/>
                     </button>
 
                     {/* Input Field */}
@@ -1197,13 +1202,13 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                         value={inputText} 
                         onChange={e => setInputText(e.target.value)} 
                         placeholder={selectedFile ? "Nhập chi tiết..." : `Hỏi ${activeLabel}...`} 
-                        className="flex-1 min-w-0 bg-transparent border-none text-white placeholder-slate-500 focus:ring-0 py-2.5 md:py-3 text-[13px] md:text-sm font-medium"
+                        className="flex-1 min-w-0 bg-transparent border-none text-white placeholder-slate-500 focus:ring-0 py-2.5 md:py-3 text-sm font-medium"
                     />
 
                     {/* Right Controls */}
-                    <div className="flex items-center gap-1 md:gap-2 pr-1.5 md:pr-2 pl-1 md:pl-2 shrink-0">
-                        {/* Mode Toggle - Minimalist Pill */}
-                        <div className="hidden sm:flex bg-slate-900/80 rounded-full p-1 border border-slate-800 items-center h-8">
+                    <div className="flex items-center gap-1.5 pr-1.5 md:pr-2 shrink-0">
+                        {/* Mode Toggle - Desktop Only */}
+                        <div className="hidden md:flex bg-slate-900/80 rounded-full p-1 border border-slate-800 items-center h-8">
                              <button 
                                 type="button" 
                                 onClick={() => setResponseStyle('CONCISE')} 
@@ -1220,14 +1225,14 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                              </button>
                         </div>
 
-                        {/* Action Button - Circular */}
+                        {/* Action Button */}
                         {!inputText && !selectedFile ? (
-                             <button type="button" onClick={() => alert("Tính năng nhập liệu bằng giọng nói đang được phát triển.")} className="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-all border border-slate-700 group">
-                                <Mic size={16} className="group-hover:scale-110 transition-transform"/>
+                             <button type="button" onClick={() => alert("Tính năng nhập liệu bằng giọng nói đang được phát triển.")} className="w-9 h-9 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-all border border-slate-700">
+                                <Mic size={16}/>
                              </button>
                         ) : (
-                            <button type="submit" className="w-8 h-8 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full flex items-center justify-center transition-all shadow-lg shadow-emerald-900/20 hover:shadow-emerald-900/40 hover:scale-105 active:scale-95">
-                                <ArrowUp size={16} strokeWidth={3}/>
+                            <button type="submit" className="w-9 h-9 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full flex items-center justify-center transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
+                                <ArrowUp size={18} strokeWidth={3}/>
                             </button>
                         )}
                     </div>

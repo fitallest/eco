@@ -79,10 +79,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, pla
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-      <div className="bg-slate-900 w-full max-w-4xl rounded-2xl border border-slate-700 shadow-2xl flex flex-col md:flex-row overflow-hidden h-[80vh] md:h-auto">
+      <div className="bg-slate-900 w-full max-w-4xl rounded-2xl border border-slate-700 shadow-2xl flex flex-col md:flex-row overflow-hidden max-h-[92vh]">
         
         {/* Left Side: Selection */}
-        <div className="w-full md:w-1/3 bg-slate-950 p-6 border-r border-slate-800 flex flex-col">
+        <div className="w-full md:w-1/3 bg-slate-950 p-4 md:p-6 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col">
           <div className="flex bg-slate-900 p-1 rounded-lg mb-6 border border-slate-800">
             <button
                 onClick={() => { setMode('SUBSCRIPTION'); setSelectedId('Gold'); }}
@@ -156,7 +156,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, pla
         </div>
 
         {/* Right Side: Payment Details */}
-        <div className="flex-1 p-6 md:p-8 flex flex-col bg-[#0f172a]">
+        <div className="flex-1 p-4 md:p-8 flex flex-col bg-[#0f172a] overflow-y-auto">
            <div className="flex justify-between items-center mb-6">
                <h2 className="text-xl font-bold text-white">Thanh toán an toàn</h2>
                <button onClick={onClose}><X className="text-slate-500 hover:text-white" /></button>

@@ -21,7 +21,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
   // Session State
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [processingSessionId, setProcessingSessionId] = useState<string | null>(null);
 
   // Computed Messages from Current Session
@@ -1139,21 +1139,21 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
              <button 
                 type="button"
                 onClick={() => setShowDraftModal(true)}
-                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-2 py-1 md:py-0 md:px-3 rounded-xl flex flex-col items-center justify-center transition-all group shrink-0"
+                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-2 py-2 md:py-0 md:px-3 rounded-xl flex flex-col items-center justify-center transition-all shrink-0 min-w-[50px] md:min-w-0"
                 title="Soạn thảo văn bản pháp lý"
              >
-                <FileText size={18} className="group-hover:text-emerald-400 mb-0.5 md:w-5 md:h-5"/>
-                <span className="text-[8px] md:text-[9px] font-bold uppercase group-hover:text-emerald-400">Soạn Đơn</span>
+                <FileText size={18} className="mb-0.5 md:w-5 md:h-5"/>
+                <span className="text-[9px] font-bold uppercase">Soạn Đơn</span>
              </button>
              
              <button 
                 type="button"
                 onClick={() => setShowToolsModal(true)}
-                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-2 py-1 md:py-0 md:px-3 rounded-xl flex flex-col items-center justify-center transition-all group shrink-0"
+                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-2 py-2 md:py-0 md:px-3 rounded-xl flex flex-col items-center justify-center transition-all shrink-0 min-w-[50px] md:min-w-0"
                 title="Tiện ích pháp lý mở rộng"
              >
-                <LayoutGrid size={18} className="group-hover:text-blue-400 mb-0.5 md:w-5 md:h-5"/>
-                <span className="text-[8px] md:text-[9px] font-bold uppercase group-hover:text-blue-400">Tiện Ích</span>
+                <LayoutGrid size={18} className="mb-0.5 md:w-5 md:h-5"/>
+                <span className="text-[9px] font-bold uppercase">Tiện Ích</span>
              </button>
 
              <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex-1 relative group">
@@ -1281,7 +1281,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                   </div>
                   
                   <div className="flex-1 overflow-y-auto custom-scrollbar flex justify-center bg-slate-900/50 rounded-2xl border border-slate-800 p-8">
-                      <div className="bg-white text-black shadow-2xl min-h-[29.7cm] w-[21cm] p-[2.54cm] origin-top transform scale-90 md:scale-100 transition-transform">
+                      <div className="bg-white text-black shadow-2xl min-h-[29.7cm] w-full max-w-[21cm] p-4 md:p-[2.54cm] origin-top transform scale-90 md:scale-100 transition-transform">
                           <MarkdownRenderer content={viewingDocument.content} mode="document" />
                       </div>
                   </div>

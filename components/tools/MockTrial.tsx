@@ -17,9 +17,11 @@ import {
   ShieldAlert,
   BarChart3,
   Shield,
-  Loader2
+  Loader2,
+  Upload
 } from 'lucide-react';
 import { sendMessageToGemini } from '../../services/geminiService';
+import * as mammoth from 'mammoth';
 
 // --- MOCK DATA (TIẾNG VIỆT) ---
 
@@ -80,7 +82,10 @@ export const MockTrial: React.FC = () => {
   const [messages, setMessages] = useState<TrialMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [expandedDocId, setExpandedDocId] = useState<string | null>(null);
+  const [activeArgs, setActiveArgs] = useState<any[]>([]);
+  const [activeDocs, setActiveDocs] = useState<any[]>([]);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll transcript
   useEffect(() => {
@@ -93,6 +98,8 @@ export const MockTrial: React.FC = () => {
     setTrialState('active');
     setLoading(true);
     setMessages([]); // Reset messages
+    setActiveArgs([]);
+    setActiveDocs([]);
 
     const introPrompt = demo ? `
     [KHỞI ĐỘNG PHIÊN TÒA GIẢ ĐỊNH - CHẾ ĐỘ DEMO]
@@ -134,6 +141,48 @@ export const MockTrial: React.FC = () => {
 
   const handleEndTrial = () => setTrialState('report');
   
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const newDoc = {
+      id: `doc-${Date.now()}`,
+      title: file.name,
+      excerpt: 'Đang trích xuất nội dung...',
+      type: file.name.endsWith('.pdf') ? 'pdf' : 'contract'
+    };
+    
+    setActiveDocs(prev => [...prev, newDoc]);
+    
+    if (file.name.endsWith('.docx')) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const arrayBuffer = ev.target?.result as ArrayBuffer;
+        if (arrayBuffer) {
+          try {
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            const text = result.value;
+            setActiveDocs(prev => prev.map(d => 
+              d.id === newDoc.id ? { ...d, excerpt: text.substring(0, 150) + '...' } : d
+            ));
+          } catch (err) {
+            console.error(err);
+          }
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        setActiveDocs(prev => prev.map(d => 
+          d.id === newDoc.id ? { ...d, excerpt: text.substring(0, 150) + '...' } : d
+        ));
+      };
+      reader.readAsText(file);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputText.trim() || loading) return;
     
@@ -148,6 +197,21 @@ export const MockTrial: React.FC = () => {
     const currentInput = inputText;
     setInputText("");
     setLoading(true);
+
+    if (!isDemoMode) {
+      setTimeout(() => {
+        const logicScore = Math.min(95, Math.max(30, 50 + (currentInput.length / 5)));
+        const persuasionRate = Math.min(90, Math.max(20, logicScore - 10));
+        
+        setActiveArgs(prev => [...prev, {
+          id: Date.now(),
+          text: currentInput,
+          logicScore: Math.round(logicScore),
+          persuasionRate: Math.round(persuasionRate),
+          loophole: logicScore < 60 ? "Lập luận thiếu căn cứ hoặc quá ngắn để thuyết phục." : null
+        }]);
+      }, 1000);
+    }
 
     // Format history for Gemini (excluding timestamps)
     const history = messages.map(m => ({
@@ -305,8 +369,8 @@ export const MockTrial: React.FC = () => {
   );
 
   const renderActive = () => {
-    const displayArgs = isDemoMode ? MOCK_ARGUMENTS : [];
-    const displayDocs = isDemoMode ? MOCK_DOCUMENTS : [];
+    const displayArgs = isDemoMode ? MOCK_ARGUMENTS : activeArgs;
+    const displayDocs = isDemoMode ? MOCK_DOCUMENTS : activeDocs;
 
     return (
     <div className="flex w-full h-[80vh] overflow-hidden bg-slate-900 rounded-xl border border-slate-800">
@@ -361,32 +425,30 @@ export const MockTrial: React.FC = () => {
 
       {/* CENTER PANE: Courtroom */}
       <div className="flex-1 lg:w-2/4 flex flex-col relative bg-slate-900">
-        {/* AI Visualizer Top Bar */}
-        <div className="h-40 border-b border-slate-800 flex flex-col items-center justify-center relative overflow-hidden bg-slate-950 shrink-0">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-900/10 via-slate-950 to-slate-950"></div>
-          
-          <div className="relative z-10 flex flex-col items-center">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-3 transition-all duration-300 ${loading ? 'bg-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.3)] border border-emerald-500/50' : 'bg-slate-800 border border-slate-700'}`}>
+        {/* AI Visualizer Compact Header */}
+        <div className="h-16 border-b border-slate-800 flex items-center px-4 justify-between bg-slate-950 shrink-0 shadow-sm z-10">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${loading ? 'bg-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.3)] border border-emerald-500/50' : 'bg-slate-800 border border-slate-700'}`}>
               {loading ? (
-                <BrainCircuit className="w-8 h-8 text-emerald-400 animate-pulse" />
+                <BrainCircuit className="w-5 h-5 text-emerald-400 animate-pulse" />
               ) : (
-                <Gavel className="w-8 h-8 text-slate-500" />
+                <Gavel className="w-5 h-5 text-slate-500" />
               )}
             </div>
-            
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            <div className="flex flex-col">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
                 Thẩm phán AI
               </span>
-              {loading && (
-                <div className="flex gap-1">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                </div>
+              {loading ? (
+                <span className="text-[10px] text-emerald-500 animate-pulse">Đang xem xét...</span>
+              ) : (
+                <span className="text-[10px] text-slate-500">Đang chờ lượt...</span>
               )}
             </div>
           </div>
+          <button onClick={handleEndTrial} className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-500 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+            <PhoneOff className="w-3 h-3" /> Kết thúc
+          </button>
         </div>
 
         {/* Transcript Area */}
@@ -419,32 +481,17 @@ export const MockTrial: React.FC = () => {
           <div ref={transcriptEndRef} />
         </div>
 
-        {/* Controls Area */}
+        {/* Controls Area Compact */}
         <div className="p-4 bg-slate-900 border-t border-slate-800 shrink-0">
-          <div className="flex items-center justify-between mb-4 px-2 lg:px-4">
+          <div className="relative flex items-center gap-2">
             <button 
               onClick={() => setIsMuted(!isMuted)}
-              className={`p-3 rounded-full transition-colors ${isMuted ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`p-3 shrink-0 rounded-xl transition-colors border ${isMuted ? 'bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}
               title={isMuted ? "Mở Mic" : "Tắt Mic"}
             >
               {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
             </button>
             
-            <button className="flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-full text-slate-300 font-medium transition-colors shadow-inner">
-              <Mic className="w-4 h-4 text-emerald-500" />
-              <span className="hidden sm:inline">Nhấn để nói</span>
-            </button>
-
-            <button 
-              onClick={handleEndTrial}
-              className="p-3 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors shadow-lg shadow-red-500/20"
-              title="Kết thúc Phiên tòa"
-            >
-              <PhoneOff className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="relative">
             <input 
               type="text" 
               value={inputText}
@@ -452,12 +499,12 @@ export const MockTrial: React.FC = () => {
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
               disabled={loading}
               placeholder="Hoặc gõ lập luận của bạn tại đây..."
-              className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl pl-4 pr-12 py-3.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent placeholder-slate-500 disabled:opacity-50"
+              className="flex-1 bg-slate-950 border border-slate-700 text-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent placeholder-slate-500 disabled:opacity-50"
             />
             <button 
               onClick={handleSendMessage}
               disabled={loading || !inputText.trim()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
+              className="p-3 shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-colors disabled:opacity-50 disabled:bg-slate-800 flex items-center justify-center shadow-lg shadow-emerald-600/20"
             >
               <Send className="w-5 h-5" />
             </button>
@@ -466,16 +513,32 @@ export const MockTrial: React.FC = () => {
       </div>
 
       {/* RIGHT PANE: Evidence */}
-      <div className="hidden lg:flex w-1/4 border-l border-slate-800 bg-slate-950 flex-col">
-        <div className="p-4 border-b border-slate-800 flex items-center gap-2 bg-slate-900">
-          <FileCheck className="w-5 h-5 text-slate-400" />
-          <h3 className="font-semibold text-slate-200">Tài Liệu & Bằng Chứng</h3>
+      <div className="hidden lg:flex w-1/4 border-l border-slate-800 bg-slate-950 flex-col relative">
+        <input ref={fileInputRef} type="file" accept=".txt,.doc,.docx,.pdf" className="hidden" onChange={handleFileUpload} />
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+          <div className="flex items-center gap-2">
+            <FileCheck className="w-5 h-5 text-slate-400" />
+            <h3 className="font-semibold text-slate-200">Tài Liệu</h3>
+          </div>
+          {!isDemoMode && (
+            <button onClick={() => fileInputRef.current?.click()} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors" title="Tải lên tài liệu">
+              <Upload className="w-4 h-4" />
+            </button>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
           {displayDocs.length === 0 ? (
-            <div className="text-center text-slate-500 text-sm mt-10 p-4 border border-slate-800 rounded-lg bg-slate-900/50">
-              <FileText className="w-8 h-8 text-slate-700 mx-auto mb-2" />
-              Chưa có tài liệu nào được trích xuất cho vụ án này. Bạn có thể tải lên ở bước trước.
+            <div className="text-center mt-10 p-5 border border-slate-800 border-dashed rounded-xl bg-slate-900/30">
+              <FileText className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+              <p className="text-slate-400 text-sm mb-4">Chưa có tài liệu nào cho vụ án này.</p>
+              {!isDemoMode && (
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 w-full"
+                >
+                  <Upload className="w-4 h-4" /> Tải lên tài liệu
+                </button>
+              )}
             </div>
           ) : displayDocs.map((doc) => (
               <div key={doc.id} className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden transition-all duration-200">

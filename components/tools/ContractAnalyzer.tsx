@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { FileText, AlertTriangle, CheckCircle, Shield, ChevronRight, Send, Eye, X, ArrowRight, Scale, Lightbulb, Upload, ClipboardPaste, Play, RotateCcw } from 'lucide-react';
 import { RiskHighlight, MOCK_CONTRACT_WITH_RISKS, MOCK_RISK_HIGHLIGHTS, Message } from '../../types';
 import { useLegalEngine } from '../../hooks/useLegalEngine';
+import * as mammoth from 'mammoth';
 
 interface ContractAnalyzerProps {
   initialDocument?: { text: string; metadata: Record<string, string> };
@@ -50,16 +51,39 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      if (text && text.trim().length > 20) {
-        setDocumentText(text);
-        setInputMode('analyzing');
-        setTimeout(() => runAnalysis(text), 100);
-      }
-    };
-    reader.readAsText(file);
+    
+    if (file.name.endsWith('.docx')) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const arrayBuffer = ev.target?.result as ArrayBuffer;
+        if (arrayBuffer) {
+          try {
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            const text = result.value;
+            if (text && text.trim().length > 20) {
+              setDocumentText(text);
+              setInputMode('analyzing');
+              setTimeout(() => runAnalysis(text), 100);
+            }
+          } catch (err) {
+            console.error('Lỗi khi đọc file .docx', err);
+            alert('Không thể đọc được file .docx này. Vui lòng copy paste nội dung.');
+          }
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        if (text && text.trim().length > 20) {
+          setDocumentText(text);
+          setInputMode('analyzing');
+          setTimeout(() => runAnalysis(text), 100);
+        }
+      };
+      reader.readAsText(file);
+    }
   };
 
   // Start analysis with demo contract

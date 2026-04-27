@@ -480,3 +480,156 @@ export const MOCK_LAWYERS: LawyerProfile[] = [
     isOnline: true
   }
 ];
+
+// === RAG Engine Types (Phase 1) ===
+export interface LegalChunk {
+  id: string;
+  content: string;
+  source: string;
+  relevanceScore: number;
+  metadata: { article?: string; law?: string; year?: number };
+}
+
+export interface RAGQuery {
+  query: string;
+  context: LegalChunk[];
+  strict_mode: boolean;
+  max_chunks: number;
+}
+
+export interface RAGResponse {
+  answer: string;
+  sources: LegalChunk[];
+  confidence: number;
+  hallucination_check: boolean;
+}
+
+// === Document Scanner Types (Phase 1) ===
+export type ScannedDocType = 'SO_DO' | 'GIAY_KHAI_SINH' | 'CAN_CUOC' | 'HOP_DONG' | 'KHAC';
+
+export interface ScannedDocument {
+  id: string;
+  type: ScannedDocType;
+  rawImage?: string;
+  extractedText: string;
+  extractedData: Record<string, string>;
+  confidence: number;
+  scannedAt: Date;
+}
+
+// === Contract Analyzer Types (Phase 2) ===
+export interface RiskHighlight {
+  id: string;
+  text: string;
+  riskLevel: 'HIGH' | 'MEDIUM' | 'LOW';
+  explanation: string;
+  suggestion: string;
+  lawReference?: string;
+  position: { start: number; end: number };
+}
+
+// === MOCK DATA: Hợp đồng mua bán nhà đất có cài cắm rủi ro ===
+export const MOCK_CONTRACT_WITH_RISKS = `HỢP ĐỒNG MUA BÁN NHÀ ĐẤT
+Số: 2026/HĐMB-BDS
+
+Hôm nay, ngày 20 tháng 04 năm 2026, tại Văn phòng Công chứng Số 5 TP.HCM, chúng tôi gồm:
+
+ĐIỀU 1: BÊN BÁN (Bên A)
+- Ông: NGUYỄN VĂN MINH
+- CCCD: 079204001234
+- Địa chỉ: 456 Nguyễn Huệ, Q.1, TP.HCM
+
+ĐIỀU 2: BÊN MUA (Bên B)
+- Bà: TRẦN THỊ HƯƠNG
+- CCCD: 079304005678
+- Địa chỉ: 789 Lý Tự Trọng, Q.3, TP.HCM
+
+ĐIỀU 3: ĐỐI TƯỢNG HỢP ĐỒNG
+Bên A đồng ý bán và Bên B đồng ý mua quyền sử dụng đất và tài sản gắn liền trên đất tại:
+- Địa chỉ: Số 123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP.HCM
+- Diện tích: 120m2 (Một trăm hai mươi mét vuông)
+- Sổ hồng số: BV 123456, do UBND Q.1 cấp ngày 15/03/2020
+
+ĐIỀU 4: GIÁ BÁN VÀ PHƯƠNG THỨC THANH TOÁN
+4.1. Giá bán: 8.500.000.000 VNĐ (Tám tỷ năm trăm triệu đồng).
+4.2. Bên B thanh toán toàn bộ 100% giá trị hợp đồng ngay khi ký. Bên A không hoàn trả bất kỳ khoản tiền nào trong mọi trường hợp.
+4.3. Bên B chấp nhận rằng giá bán đã bao gồm tất cả các loại thuế, phí chuyển nhượng.
+
+ĐIỀU 5: BÀN GIAO TÀI SẢN
+5.1. Bên A sẽ bàn giao nhà đất trong vòng 180 ngày kể từ ngày thanh toán.
+5.2. Trong thời gian chờ bàn giao, Bên A có quyền tiếp tục sử dụng tài sản cho mục đích cá nhân.
+5.3. Nếu chậm bàn giao, Bên A chỉ phải bồi thường 0.01%/ngày trên giá trị hợp đồng.
+
+ĐIỀU 6: QUYỀN VÀ NGHĨA VỤ CÁC BÊN
+6.1. Bên B không được chuyển nhượng hợp đồng này cho bên thứ ba nếu chưa có sự đồng ý BẰNG VĂN BẢN của Bên A.
+6.2. Mọi tranh chấp sẽ được giải quyết tại Trọng tài do Bên A chỉ định.
+6.3. Bên B từ bỏ quyền khởi kiện tại Tòa án.
+
+ĐIỀU 7: PHẠT VI PHẠM HỢP ĐỒNG
+7.1. Nếu Bên B vi phạm bất kỳ điều khoản nào, Bên B sẽ mất toàn bộ số tiền đã thanh toán và hợp đồng tự động chấm dứt.
+7.2. Nếu Bên A vi phạm, Bên A chỉ phải hoàn trả 50% số tiền đã nhận từ Bên B.
+
+ĐIỀU 8: ĐIỀU KHOẢN CHUNG
+8.1. Hợp đồng này có hiệu lực kể từ ngày ký và được lập thành 04 bản có giá trị pháp lý như nhau.
+8.2. Các bên đã đọc kỹ, hiểu rõ và đồng ý toàn bộ nội dung hợp đồng.
+
+              BÊN A                                    BÊN B
+         (Ký, ghi rõ họ tên)                     (Ký, ghi rõ họ tên)
+`;
+
+export const MOCK_RISK_HIGHLIGHTS: RiskHighlight[] = [
+  {
+    id: 'RISK-001',
+    text: 'Bên B thanh toán toàn bộ 100% giá trị hợp đồng ngay khi ký. Bên A không hoàn trả bất kỳ khoản tiền nào trong mọi trường hợp.',
+    riskLevel: 'HIGH',
+    explanation: '⚠️ RỦI RO CỰC CAO: Thanh toán 100% ngay khi ký mà không chia đợt. Điều khoản "không hoàn trả trong mọi trường hợp" trái với Điều 428 BLDS 2015 về quyền hủy bỏ hợp đồng khi có vi phạm nghiêm trọng.',
+    suggestion: '✅ ĐỀ XUẤT: Thanh toán theo 3 đợt — Đợt 1: 30% khi ký HĐ, Đợt 2: 40% khi bàn giao nhà, Đợt 3: 30% khi hoàn tất sang tên Sổ đỏ.',
+    lawReference: 'Điều 428, Bộ luật Dân sự 2015',
+    position: { start: 0, end: 0 }
+  },
+  {
+    id: 'RISK-002',
+    text: 'Bên A sẽ bàn giao nhà đất trong vòng 180 ngày kể từ ngày thanh toán.',
+    riskLevel: 'HIGH',
+    explanation: '⚠️ 180 ngày (6 tháng) là thời gian bàn giao quá dài sau khi đã thanh toán 100%. Bên B chịu rủi ro tài chính rất lớn trong suốt thời gian chờ đợi.',
+    suggestion: '✅ ĐỀ XUẤT: Bàn giao trong vòng 30 ngày kể từ ngày thanh toán đợt 1. Gắn mốc thanh toán với mốc bàn giao để đảm bảo quyền lợi.',
+    lawReference: 'Điều 434, Bộ luật Dân sự 2015',
+    position: { start: 0, end: 0 }
+  },
+  {
+    id: 'RISK-003',
+    text: 'Bên A chỉ phải bồi thường 0.01%/ngày trên giá trị hợp đồng.',
+    riskLevel: 'MEDIUM',
+    explanation: '🟡 Mức phạt 0.01%/ngày là quá thấp (8.5 tỷ × 0.01% = chỉ 850.000đ/ngày). Không đủ sức răn đe, Bên A có thể cố tình kéo dài thời gian bàn giao.',
+    suggestion: '✅ ĐỀ XUẤT: Tăng mức phạt lên 0.05%/ngày và thêm quyền hủy HĐ + hoàn tiền 100% nếu chậm quá 30 ngày.',
+    lawReference: 'Điều 418, Bộ luật Dân sự 2015',
+    position: { start: 0, end: 0 }
+  },
+  {
+    id: 'RISK-004',
+    text: 'Mọi tranh chấp sẽ được giải quyết tại Trọng tài do Bên A chỉ định.',
+    riskLevel: 'HIGH',
+    explanation: '⚠️ ĐIỀU KHOẢN GÀI BẪY: Trọng tài do một bên chỉ định sẽ thiên vị cho bên đó. Bên B mất đi quyền lựa chọn cơ quan giải quyết tranh chấp trung lập.',
+    suggestion: '✅ ĐỀ XUẤT: Giải quyết tại TAND có thẩm quyền nơi có bất động sản, hoặc Trung tâm Trọng tài Quốc tế Việt Nam (VIAC) — tổ chức trung lập.',
+    lawReference: 'Điều 30, Luật Trọng tài Thương mại 2010',
+    position: { start: 0, end: 0 }
+  },
+  {
+    id: 'RISK-005',
+    text: 'Bên B từ bỏ quyền khởi kiện tại Tòa án.',
+    riskLevel: 'HIGH',
+    explanation: '🔴 TRÁI LUẬT NGHIÊM TRỌNG! Quyền khởi kiện là quyền hiến định theo Hiến pháp 2013. Không ai có thể bị ép buộc từ bỏ quyền này bằng hợp đồng. Điều khoản này hoàn toàn VÔ HIỆU.',
+    suggestion: '✅ ĐỀ XUẤT: XÓA BỎ hoàn toàn điều khoản này. Thay bằng: "Các bên có quyền khởi kiện tại Tòa án nhân dân có thẩm quyền theo quy định pháp luật."',
+    lawReference: 'Điều 122 BLDS 2015 + Điều 30 Hiến pháp 2013',
+    position: { start: 0, end: 0 }
+  },
+  {
+    id: 'RISK-006',
+    text: 'Bên B sẽ mất toàn bộ số tiền đã thanh toán và hợp đồng tự động chấm dứt.',
+    riskLevel: 'HIGH',
+    explanation: '⚠️ BẤT CÔNG NGHIÊM TRỌNG: Bên B vi phạm → mất 8.5 tỷ đồng. Trong khi Bên A vi phạm → chỉ hoàn 50%. Đây là sự mất cân bằng quyền lợi rõ ràng, có dấu hiệu lợi dụng.',
+    suggestion: '✅ ĐỀ XUẤT: Mức phạt vi phạm phải BÌNH ĐẲNG cho cả hai bên. Áp dụng phạt tối đa 8% giá trị HĐ (680 triệu) theo thông lệ thị trường.',
+    lawReference: 'Điều 418 Khoản 2, Bộ luật Dân sự 2015',
+    position: { start: 0, end: 0 }
+  }
+];

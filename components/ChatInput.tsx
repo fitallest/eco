@@ -37,7 +37,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
 
   return (
     <div className="w-full bg-white border-t border-slate-200 p-4">
-      <form 
+      <form
         onSubmit={handleSubmit}
         className="max-w-3xl mx-auto relative flex items-end gap-2 bg-slate-50 border border-slate-300 rounded-2xl p-2 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all"
       >
@@ -61,7 +61,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
       </form>
       <div className="max-w-3xl mx-auto mt-2 text-center">
         <p className="text-[10px] text-slate-400">
-          Powered by Gemini 3 Flash. AI can make mistakes, so please double-check responses.
+          Powered by ECOLAW.AI AI can make mistakes, so please double-check responses.
         </p>
       </div>
     </div>

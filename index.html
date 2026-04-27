@@ -157,6 +157,28 @@
       .mobile-scroll-x > * {
         scroll-snap-align: start;
       }
+
+      /* Document Scanner — Laser sweep animation */
+      @keyframes scannerLaser {
+        0% { top: 15%; }
+        50% { top: 75%; }
+        100% { top: 15%; }
+      }
+      .animate-scanner-laser {
+        animation: scannerLaser 2.5s ease-in-out infinite;
+      }
+
+      /* Risk Highlight — Pulse glow when clicked */
+      @keyframes riskPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.4); }
+        25% { box-shadow: 0 0 0 8px rgba(250, 204, 21, 0.15); }
+        50% { box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.3); }
+        75% { box-shadow: 0 0 0 8px rgba(250, 204, 21, 0.15); }
+      }
+      .animate-risk-pulse {
+        animation: riskPulse 1s ease-in-out 3;
+        background-color: rgba(250, 204, 21, 0.25) !important;
+      }
   </style>
 </head>
   <body class="overflow-x-hidden w-full max-w-[100vw]">

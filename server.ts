@@ -268,6 +268,174 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
     }
   });
 
+  // ── Contract Risk Analysis endpoint ─────────────────────────────────
+  app.post("/api/contract-analyze", async (req, res) => {
+    try {
+      const { contractText } = req.body;
+      if (!contractText || contractText.trim().length < 50) {
+        return res.status(400).json({ error: 'Nội dung hợp đồng quá ngắn hoặc trống.' });
+      }
+
+      const systemPrompt = `Bạn là ECOLAW.AI — Chuyên gia phân tích rủi ro hợp đồng pháp lý Việt Nam.
+
+NHIỆM VỤ: Đọc toàn bộ hợp đồng và tìm TẤT CẢ các điều khoản có rủi ro pháp lý cho bên mua/bên yếu thế hơn.
+
+QUY TẮC BẮT BUỘC:
+1. Chỉ phân tích dựa trên NỘI DUNG HỢP ĐỒNG được cung cấp — KHÔNG bịa đặt.
+2. Mỗi rủi ro phải trích dẫn CHÍNH XÁC đoạn text gốc trong hợp đồng.
+3. Phải có căn cứ pháp luật Việt Nam (Điều, Khoản, Luật cụ thể).
+4. Xếp hạng rủi ro: HIGH (trái luật hoặc bất công nghiêm trọng), MEDIUM (bất lợi nhưng hợp pháp), LOW (cần lưu ý).
+
+TRẢ VỀ JSON THUẦN TÚY (không markdown, không backtick), theo format:
+{
+  "summary": "Tóm tắt ngắn gọn tình trạng hợp đồng",
+  "recommendation": "KHÔNG NÊN KÝ / CẦN SỬA ĐỔI / AN TOÀN",
+  "risks": [
+    {
+      "id": "RISK-001",
+      "text": "Đoạn text CHÍNH XÁC từ hợp đồng chứa rủi ro",
+      "riskLevel": "HIGH",
+      "explanation": "Giải thích tại sao điều khoản này nguy hiểm",
+      "suggestion": "Đề xuất thay thế cụ thể",
+      "lawReference": "Điều X, Luật Y năm Z"
+    }
+  ]
+}`;
+
+      let result: any;
+
+      // Try OpenAI first
+      if (process.env.OPENAI_API_KEY) {
+        try {
+          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          const completion = await client.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Phân tích hợp đồng sau:\n\n${contractText}` }
+            ],
+            temperature: 0.1,
+            response_format: { type: 'json_object' }
+          });
+          const raw = completion.choices[0]?.message?.content || '{}';
+          result = JSON.parse(raw);
+        } catch (openaiErr: any) {
+          console.error('OpenAI contract-analyze error, trying Gemini:', openaiErr.message);
+        }
+      }
+
+      // Fallback to Gemini
+      if (!result && process.env.GEMINI_API_KEY) {
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const response = await ai.models.generateContent({
+          model: 'gemini-flash-latest',
+          contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nPhân tích hợp đồng sau:\n\n${contractText}` }] }],
+          config: { temperature: 0.1, responseMimeType: 'application/json' }
+        });
+        const raw = response.text || '{}';
+        result = JSON.parse(raw);
+      }
+
+      if (!result) throw new Error('Không có API key nào khả dụng.');
+
+      // Validate and normalize
+      const risks = (result.risks || []).map((r: any, i: number) => ({
+        id: r.id || `RISK-${String(i + 1).padStart(3, '0')}`,
+        text: r.text || '',
+        riskLevel: ['HIGH', 'MEDIUM', 'LOW'].includes(r.riskLevel) ? r.riskLevel : 'MEDIUM',
+        explanation: r.explanation || '',
+        suggestion: r.suggestion || '',
+        lawReference: r.lawReference || '',
+        position: { start: 0, end: 0 }
+      }));
+
+      res.json({
+        summary: result.summary || 'Phân tích hoàn tất.',
+        recommendation: result.recommendation || 'CẦN SỬA ĐỔI',
+        risks,
+        source: process.env.OPENAI_API_KEY ? 'OPENAI' : 'GEMINI'
+      });
+
+    } catch (error: any) {
+      console.error('Contract Analysis Error:', error);
+      res.status(500).json({ error: `Lỗi phân tích: ${error.message}` });
+    }
+  });
+
+  // ── Contract Chat endpoint ──────────────────────────────────────────
+  app.post("/api/contract-chat", async (req, res) => {
+    try {
+      const { question, contractText, chatHistory } = req.body;
+      if (!question) return res.status(400).json({ error: 'Thiếu câu hỏi.' });
+
+      const systemPrompt = `Bạn là ECOLAW.AI — Trợ lý phân tích hợp đồng pháp lý.
+
+CHẾ ĐỘ: STRICT MODE (Chỉ trả lời dựa trên nội dung hợp đồng và pháp luật Việt Nam)
+
+QUY TẮC:
+1. CHỈ trả lời dựa trên nội dung hợp đồng đã cung cấp và kiến thức pháp luật Việt Nam.
+2. Nếu câu hỏi nằm ngoài phạm vi hợp đồng, nói rõ "Thông tin này không có trong hợp đồng."
+3. Trích dẫn chính xác điều khoản khi trả lời.
+4. Luôn đề cập căn cứ pháp luật (Điều, Khoản, Luật).
+5. Trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu.
+6. KHÔNG bịa đặt thông tin không có trong hợp đồng.
+
+NỘI DUNG HỢP ĐỒNG ĐANG PHÂN TÍCH:
+${contractText || 'Không có hợp đồng.'}`;
+
+      let answer = '';
+
+      // Try OpenAI first
+      if (process.env.OPENAI_API_KEY) {
+        try {
+          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+            { role: 'system', content: systemPrompt }
+          ];
+          for (const msg of (chatHistory || [])) {
+            messages.push({ role: msg.role === 'model' ? 'assistant' : 'user', content: msg.text || '' });
+          }
+          messages.push({ role: 'user', content: question });
+
+          const completion = await client.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages,
+            temperature: 0.2,
+          });
+          answer = completion.choices[0]?.message?.content || 'Không có phản hồi.';
+        } catch (openaiErr: any) {
+          console.error('OpenAI contract-chat error, trying Gemini:', openaiErr.message);
+        }
+      }
+
+      // Fallback to Gemini
+      if (!answer && process.env.GEMINI_API_KEY) {
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const historyParts = (chatHistory || []).map((m: any) => ({
+          role: m.role === 'model' ? 'model' : 'user',
+          parts: [{ text: m.text || '' }]
+        }));
+        const response = await ai.models.generateContent({
+          model: 'gemini-flash-latest',
+          contents: [
+            ...historyParts,
+            { role: 'user', parts: [{ text: question }] }
+          ],
+          config: { systemInstruction: systemPrompt, temperature: 0.2 }
+        });
+        answer = response.text || 'Không có phản hồi.';
+      }
+
+      if (!answer) throw new Error('Không có API key nào khả dụng.');
+
+      res.json({ answer, source: process.env.OPENAI_API_KEY ? 'OPENAI' : 'GEMINI' });
+
+    } catch (error: any) {
+      console.error('Contract Chat Error:', error);
+      res.status(500).json({ error: `Lỗi: ${error.message}` });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const vite = await createViteServer({

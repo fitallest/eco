@@ -93,11 +93,26 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
     }
   }, []); // eslint-disable-line
 
-  // Handle file upload (.txt, .doc, .pdf text extraction)
+  // Handle file upload (.txt, .doc, .docx text extraction)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
+    // Alert immediately to provide feedback
+    // alert(`Đang xử lý file: ${file.name}`);
+
+    const checkAndAnalyze = (text: string) => {
+      if (text && text.trim().length > 20) {
+        setDocumentText(text);
+        setInputMode('analyzing');
+        setTimeout(() => runAnalysis(text), 100);
+      } else {
+        alert('Nội dung file quá ngắn hoặc không thể đọc được chữ (có thể là ảnh chụp hoặc PDF dạng ảnh). Vui lòng copy paste nội dung hoặc dùng chức năng Quét Ảnh.');
+      }
+      // Reset input value to allow re-uploading the same file
+      e.target.value = '';
+    };
+
     if (file.name.endsWith('.docx')) {
       const reader = new FileReader();
       reader.onload = async (ev) => {
@@ -105,15 +120,11 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
         if (arrayBuffer) {
           try {
             const result = await mammoth.extractRawText({ arrayBuffer });
-            const text = result.value;
-            if (text && text.trim().length > 20) {
-              setDocumentText(text);
-              setInputMode('analyzing');
-              setTimeout(() => runAnalysis(text), 100);
-            }
+            checkAndAnalyze(result.value);
           } catch (err) {
             console.error('Lỗi khi đọc file .docx', err);
             alert('Không thể đọc được file .docx này. Vui lòng copy paste nội dung.');
+            e.target.value = '';
           }
         }
       };
@@ -122,11 +133,7 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
       const reader = new FileReader();
       reader.onload = (ev) => {
         const text = ev.target?.result as string;
-        if (text && text.trim().length > 20) {
-          setDocumentText(text);
-          setInputMode('analyzing');
-          setTimeout(() => runAnalysis(text), 100);
-        }
+        checkAndAnalyze(text);
       };
       reader.readAsText(file);
     }

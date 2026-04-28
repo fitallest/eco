@@ -1032,92 +1032,82 @@ ${textToSend}
                                 <p className="whitespace-pre-wrap">{msg.text}</p>
                             ) : (
                                 <>
-                                {msg.metadata?.ragInjected && (
-                                    <div className="mb-4 bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 p-2.5 rounded-lg flex items-start gap-2 text-xs">
-                                        <Database size={14} className="mt-0.5 shrink-0" />
-                                        <div>
-                                            <span className="font-bold">Đã tham chiếu Knowledge Base (RAG): </span>
-                                            {msg.metadata.ragDocs?.length} tài liệu: {(msg.metadata.ragDocs || []).join(', ')}.
+                                    {msg.metadata?.ragInjected && (
+                                        <div className="mb-4 bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 p-2.5 rounded-lg flex items-start gap-2 text-xs">
+                                            <Database size={14} className="mt-0.5 shrink-0" />
+                                            <div>
+                                                <span className="font-bold">Đã tham chiếu Knowledge Base (RAG): </span>
+                                                {msg.metadata.ragDocs?.length} tài liệu: {(msg.metadata.ragDocs || []).join(', ')}.
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                                {msg.metadata?.type === 'DRAFT_DOCUMENT' ? (
-                                    (() => {
-                                        const cleanText = cleanDocumentContent(msg.text);
-                                        return (
-                                            <div className="w-full overflow-x-auto bg-slate-950/50 p-4 rounded-xl border border-slate-800">
-                                                <div className="flex justify-between items-center mb-4 px-2">
-                                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                                        <FileText size={14} className="text-emerald-500"/> Bản xem trước văn bản
-                                                    </span>
-                                                    <div className="flex gap-2">
-                                                         <button 
-                                                            onClick={() => setViewingDocument({ content: cleanText, title: msg.metadata?.docName || 'Văn bản' })}
-                                                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-white flex items-center gap-1 transition-colors"
-                                                         >
-                                                             <BookOpen size={14}/> Xem A4
-                                                         </button>
-                                                         <button 
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(cleanText);
-                                                                alert('Đã sao chép văn bản!');
-                                                            }}
-                                                            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
-                                                            title="Sao chép"
-                                                        >
-                                                            <Copy size={16}/>
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => {
-                                                                // Simple MD to HTML conversion for Word
-                                                                let html = cleanText
-                                                                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-                                                                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-                                                                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-                                                                    .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
-                                                                    .replace(/\*(.*)\*/gim, '<i>$1</i>')
-                                                                    .replace(/\n/gim, '<br />');
-                                                                const content = `<html><head><meta charset='utf-8'></head><body>${html}</body></html>`;
-                                                                
-                                                                const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
-                                                                const url = URL.createObjectURL(blob);
-                                                                const link = document.createElement('a');
-                                                                link.href = url;
-                                                                link.download = `${msg.metadata?.docName || 'van_ban'}.doc`;
-                                                                document.body.appendChild(link);
-                                                                link.click();
-                                                                document.body.removeChild(link);
-                                                            }}
-                                                            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-emerald-400 transition-colors"
-                                                            title="Tải về"
-                                                        >
-                                                            <Download size={16}/>
-                                                        </button>
+                                    )}
+                                    {msg.metadata?.type === 'DRAFT_DOCUMENT' ? (
+                                        (() => {
+                                            const cleanText = cleanDocumentContent(msg.text);
+                                            return (
+                                                <div className="w-full overflow-x-auto bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                                                    <div className="flex justify-between items-center mb-4 px-2">
+                                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                                            <FileText size={14} className="text-emerald-500"/> Bản xem trước văn bản
+                                                        </span>
+                                                        <div className="flex gap-2">
+                                                             <button 
+                                                                onClick={() => setViewingDocument({ content: cleanText, title: msg.metadata?.docName || 'Văn bản' })}
+                                                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-white flex items-center gap-1 transition-colors"
+                                                             >
+                                                                 <BookOpen size={14}/> Xem A4
+                                                             </button>
+                                                             <button 
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(cleanText);
+                                                                    alert('Đã sao chép văn bản!');
+                                                                }}
+                                                                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                                                                title="Sao chép"
+                                                            >
+                                                                <Copy size={16}/>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    // Simple MD to HTML conversion for Word
+                                                                    let html = cleanText
+                                                                        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                                                                        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                                                                        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                                                                        .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
+                                                                        .replace(/\*(.*)\*/gim, '<i>$1</i>')
+                                                                        .replace(/\n/gim, '<br />');
+                                                                    const content = `<html><head><meta charset='utf-8'></head><body>${html}</body></html>`;
+                                                                    
+                                                                    const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
+                                                                    const url = URL.createObjectURL(blob);
+                                                                    const link = document.createElement('a');
+                                                                    link.href = url;
+                                                                    link.download = `${msg.metadata?.docName || 'van_ban'}.doc`;
+                                                                    document.body.appendChild(link);
+                                                                    link.click();
+                                                                    document.body.removeChild(link);
+                                                                }}
+                                                                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-emerald-400 transition-colors"
+                                                                title="Tải về"
+                                                            >
+                                                                <Download size={16}/>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Mini Preview Container */}
+                                                    <div className="mx-auto shadow-2xl overflow-hidden max-h-[300px] relative">
+                                                        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-950 pointer-events-none"></div>
+                                                        <MarkdownRenderer content={cleanText} mode="document" />
                                                     </div>
                                                 </div>
-                                                
-                                                {/* Mini Preview Container */}
-                                                <div className="mx-auto shadow-2xl overflow-hidden max-h-[300px] relative">
-                                                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-950 pointer-events-none"></div>
-                                                    <MarkdownRenderer content={cleanText} mode="document" />
-                                                </div>
-                                            </div>
-                                        );
-                                    })()
-                                ) : (
-                                    <>
-                                        {msg.metadata?.ragInjected && (
-                                            <div className="mb-4 bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 p-2.5 rounded-lg flex items-start gap-2 text-xs">
-                                                <Database size={14} className="mt-0.5 shrink-0" />
-                                                <div>
-                                                    <span className="font-bold">Đã tham chiếu Knowledge Base (RAG): </span>
-                                                    {msg.metadata.ragDocs?.length} tài liệu: {(msg.metadata.ragDocs || []).join(', ')}.
-                                                </div>
-                                            </div>
-                                        )}
+                                            );
+                                        })()
+                                    ) : (
                                         <MarkdownRenderer content={msg.text} />
-                                    </>
-                                )
+                                    )}
+                                </>
                             )}
 
                             {msg.role === 'user' && (

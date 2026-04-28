@@ -395,16 +395,10 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
     });
   };
 
-  // Hidden file input
-  const fileInput = (
-    <input ref={fileInputRef} type="file" accept=".txt,.doc,.docx,.pdf,.rtf" className="hidden" onChange={handleFileUpload} />
-  );
-
   // === INPUT MODE: CHOOSE ===
   if (inputMode === 'choose') {
     return (
       <div className="flex h-full w-full bg-[#020617] text-slate-200 items-center justify-center">
-        {fileInput}
         <div className="max-w-2xl w-full px-6">
           {/* Header */}
           <div className="text-center mb-10">
@@ -438,10 +432,10 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
             </button>
 
             {/* Upload */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="group flex items-center gap-4 p-5 bg-slate-900/50 border border-slate-800 rounded-xl hover:border-blue-500/40 hover:bg-blue-500/5 transition-all text-left"
+            <label
+              className="group flex items-center gap-4 p-5 bg-slate-900/50 border border-slate-800 rounded-xl hover:border-blue-500/40 hover:bg-blue-500/5 transition-all text-left cursor-pointer"
             >
+              <input type="file" accept=".txt,.doc,.docx,.pdf,.rtf" className="hidden" onChange={handleFileUpload} onClick={(e) => { (e.target as HTMLInputElement).value = ''; }} />
               <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center group-hover:bg-blue-500/20 transition-colors shrink-0">
                 <Upload size={22} className="text-blue-400" />
               </div>
@@ -450,7 +444,7 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
                 <p className="text-xs text-slate-500 mt-0.5">Hỗ trợ .txt, .doc, .docx (đọc dạng text)</p>
               </div>
               <ArrowRight size={18} className="text-slate-600 group-hover:text-blue-400 ml-auto transition-colors" />
-            </button>
+            </label>
 
             {/* Demo */}
             <button

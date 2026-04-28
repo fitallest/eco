@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Cpu, Zap, BookOpen, Terminal, Activity, HelpCircle, ArrowDown, ArrowUp, X, AlertTriangle, ChevronDown, Check, LayoutGrid, Edit2, Save, Star, Calendar, FileText, Trash2, Copy, Download, MessageSquare, Plus, Edit3, ChevronLeft, Menu, PanelLeftClose, Paperclip, Mic } from 'lucide-react';
+import { Cpu, Zap, BookOpen, Terminal, Activity, HelpCircle, ArrowDown, ArrowUp, X, AlertTriangle, ChevronDown, Check, LayoutGrid, Edit2, Save, Star, Calendar, FileText, Trash2, Copy, Download, MessageSquare, Plus, Edit3, ChevronLeft, Menu, PanelLeftClose, Paperclip, Mic, Database } from 'lucide-react';
 import { Message, AgentStage, UserProfile, AgentType, ResponseStyle, AgentConfig, AGENTS_LIST, MOCK_LAWYERS, LawyerProfile, DocumentTemplate, ChatSession } from '../types';
 import { sendMessageToGemini } from '../services/geminiService';
 import { MarkdownRenderer } from './MarkdownRenderer';

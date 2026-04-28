@@ -8,6 +8,8 @@ import { BookingModal } from './BookingModal';
 import { NewsSection } from './NewsSection';
 import { LegalToolsModal } from './LegalToolsModal';
 import { DraftDocumentModal } from './DraftDocumentModal';
+import { KnowledgeBaseModal } from './KnowledgeBaseModal';
+import { retrieveRelevantContext } from '../services/ragService';
 
 interface UserChatProps {
   currentUser: UserProfile;
@@ -111,6 +113,9 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
   
   // Tools Modal State
   const [showToolsModal, setShowToolsModal] = useState(false);
+
+  // KB Modal State
+  const [showKBModal, setShowKBModal] = useState(false);
 
   // Booking Modal State
   const [bookingLawyer, setBookingLawyer] = useState<LawyerProfile | null>(null);
@@ -444,9 +449,28 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
         `;
     }
 
+    // -> RAG KNOWLEDGE BASE INJECTION <-
+    let extraMetadata: any = {};
+    if (currentUser.level === 'Enterprise' && !fileToSend) {
+        // Retrieve relevant context from Knowledge Base
+        const ragContext = await retrieveRelevantContext(textToSend);
+        if (ragContext && ragContext.length > 0) {
+            const contextText = ragContext.map(c => `[Tài liệu: ${c.docTitle}]\n${c.content}`).join('\n\n');
+            finalPrompt = `
+[THÔNG TIN NỘI BỘ (RAG KNOWLEDGE BASE)]
+Hãy ưu tiên sử dụng các đoạn thông tin nội bộ sau để trả lời yêu cầu của người dùng (nếu có liên quan):
+${contextText}
+---
+YÊU CẦU CỦA NGƯỜI DÙNG:
+${textToSend}
+            `;
+            extraMetadata = { ragInjected: true, ragDocs: [...new Set(ragContext.map(c => c.docTitle))] };
+        }
+    }
+
     const attachmentData = fileToSend ? { mimeType: fileToSend.type, data: fileToSend.data } : undefined;
     
-    await processAIResponse(finalPrompt, contextMessages, 1, false, undefined, activeSessionId, attachmentData);
+    await processAIResponse(finalPrompt, contextMessages, 1, false, extraMetadata, activeSessionId, attachmentData);
   };
 
   // --- Document Drafting Logic ---
@@ -460,7 +484,8 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
       
       // 2. Open Form
       setSelectedDocForForm(doc);
-      setDraftFormData({});
+      // Keep existing form data (like OCR results) but ensure it's an object
+      setDraftFormData(prev => ({ ...prev }));
   };
 
   const handleGenerateDocument = async () => {
@@ -640,6 +665,12 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
             {/* ... header content ... */}
             <div className="font-bold text-xl font-mono">ecolaw<span className="text-emerald-500">.ai</span></div>
             <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setShowKBModal(true)}
+                  className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-emerald-400 hover:text-white border border-transparent hover:border-emerald-500/50 rounded-lg transition-all"
+                >
+                  <Database size={14}/> KNOWLEDGE BASE
+                </button>
                 <button 
                   onClick={() => onCommand('/admin')}
                   className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-white border border-transparent hover:border-slate-700 rounded-lg transition-all"
@@ -921,6 +952,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                     )}
                  </div>
                  
+                 <button onClick={() => setShowKBModal(true)} className="hidden md:flex items-center gap-2 text-slate-400 hover:text-emerald-400 px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-colors" title="Knowledge Base"><Database size={16}/> <span className="text-xs font-bold">RAG</span></button>
                  <button onClick={() => onCommand('/admin')} className="hidden md:block text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors" title="Admin Dashboard"><LayoutGrid size={18}/></button>
                  <button onClick={() => onTriggerUpgrade('SUBSCRIPTION')} className="bg-emerald-900/30 text-emerald-400 text-[10px] md:text-xs px-2 py-1.5 md:px-3 md:py-1.5 rounded-lg border border-emerald-500/30 hover:bg-emerald-900/50 transition-colors font-mono font-bold whitespace-nowrap min-h-[32px]">
                      <span className="hidden sm:inline">UPGRADE</span>
@@ -999,7 +1031,17 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                             {msg.role === 'user' ? (
                                 <p className="whitespace-pre-wrap">{msg.text}</p>
                             ) : (
-                                msg.metadata?.type === 'DRAFT_DOCUMENT' ? (
+                                <>
+                                {msg.metadata?.ragInjected && (
+                                    <div className="mb-4 bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 p-2.5 rounded-lg flex items-start gap-2 text-xs">
+                                        <Database size={14} className="mt-0.5 shrink-0" />
+                                        <div>
+                                            <span className="font-bold">Đã tham chiếu Knowledge Base (RAG): </span>
+                                            {msg.metadata.ragDocs?.length} tài liệu: {(msg.metadata.ragDocs || []).join(', ')}.
+                                        </div>
+                                    </div>
+                                )}
+                                {msg.metadata?.type === 'DRAFT_DOCUMENT' ? (
                                     (() => {
                                         const cleanText = cleanDocumentContent(msg.text);
                                         return (
@@ -1027,11 +1069,21 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                                                         </button>
                                                         <button 
                                                             onClick={() => {
-                                                                const blob = new Blob([cleanText], { type: 'text/plain;charset=utf-8' });
+                                                                // Simple MD to HTML conversion for Word
+                                                                let html = cleanText
+                                                                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                                                                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                                                                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                                                                    .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
+                                                                    .replace(/\*(.*)\*/gim, '<i>$1</i>')
+                                                                    .replace(/\n/gim, '<br />');
+                                                                const content = `<html><head><meta charset='utf-8'></head><body>${html}</body></html>`;
+                                                                
+                                                                const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
                                                                 const url = URL.createObjectURL(blob);
                                                                 const link = document.createElement('a');
                                                                 link.href = url;
-                                                                link.download = `${msg.metadata?.docName || 'van_ban'}.txt`;
+                                                                link.download = `${msg.metadata?.docName || 'van_ban'}.doc`;
                                                                 document.body.appendChild(link);
                                                                 link.click();
                                                                 document.body.removeChild(link);
@@ -1053,7 +1105,18 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                                         );
                                     })()
                                 ) : (
-                                    <MarkdownRenderer content={msg.text} />
+                                    <>
+                                        {msg.metadata?.ragInjected && (
+                                            <div className="mb-4 bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 p-2.5 rounded-lg flex items-start gap-2 text-xs">
+                                                <Database size={14} className="mt-0.5 shrink-0" />
+                                                <div>
+                                                    <span className="font-bold">Đã tham chiếu Knowledge Base (RAG): </span>
+                                                    {msg.metadata.ragDocs?.length} tài liệu: {(msg.metadata.ragDocs || []).join(', ')}.
+                                                </div>
+                                            </div>
+                                        )}
+                                        <MarkdownRenderer content={msg.text} />
+                                    </>
                                 )
                             )}
 
@@ -1266,18 +1329,27 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
                       <div className="flex items-center gap-3">
                           <button 
                             onClick={() => {
-                                const blob = new Blob([viewingDocument.content], { type: 'text/plain;charset=utf-8' });
+                                let html = viewingDocument.content
+                                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                                    .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
+                                    .replace(/\*(.*)\*/gim, '<i>$1</i>')
+                                    .replace(/\n/gim, '<br />');
+                                const content = `<html><head><meta charset='utf-8'></head><body>${html}</body></html>`;
+                                
+                                const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
                                 const url = URL.createObjectURL(blob);
                                 const link = document.createElement('a');
                                 link.href = url;
-                                link.download = `${viewingDocument.title}.txt`;
+                                link.download = `${viewingDocument.title}.doc`;
                                 document.body.appendChild(link);
                                 link.click();
                                 document.body.removeChild(link);
                             }}
                             className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors"
                           >
-                              <Download size={18}/> Tải về
+                              <Download size={18}/> Tải về (Word)
                           </button>
                           <button onClick={() => setViewingDocument(null)} className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg transition-colors">
                               <X size={24}/>
@@ -1305,8 +1377,22 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
       )}
 
       <CreditModal isOpen={showCreditModal} onClose={() => setShowCreditModal(false)} onUpgrade={(mode) => { setShowCreditModal(false); onTriggerUpgrade(mode); }} />
-      
-      <LegalToolsModal isOpen={showToolsModal} onClose={() => setShowToolsModal(false)} />
+      <LegalToolsModal 
+          isOpen={showToolsModal} 
+          onClose={() => setShowToolsModal(false)}
+          onDraftDocument={(text, metadata) => {
+              setShowToolsModal(false);
+              // Pre-fill form data with OCR results
+              setDraftFormData(metadata);
+              setShowDraftModal(true);
+          }}
+          userLevel={currentUser.level}
+      />
+      <KnowledgeBaseModal
+          isOpen={showKBModal}
+          onClose={() => setShowKBModal(false)}
+          userLevel={currentUser.level}
+      />
       </div>
     </div>
   );

@@ -42,7 +42,7 @@ ${contractText || 'Không có hợp đồng.'}`;
         messages.push({ role: 'user', content: question });
 
         const completion = await client.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4o',
           messages,
           temperature: 0.2,
         });
@@ -61,7 +61,7 @@ ${contractText || 'Không có hợp đồng.'}`;
           parts: [{ text: m.text || '' }]
         }));
         const response = await ai.models.generateContent({
-          model: 'gemini-flash-latest',
+          model: 'gemini-1.5-pro-latest',
           contents: [
             ...historyParts,
             { role: 'user', parts: [{ text: question }] }

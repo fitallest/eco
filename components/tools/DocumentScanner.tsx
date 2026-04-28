@@ -5,6 +5,7 @@ import { ScannedDocument, ScannedDocType } from '../../types';
 interface DocumentScannerProps {
   onScanComplete?: (doc: ScannedDocument) => void;
   onAnalyzeContract?: (text: string, metadata: Record<string, string>) => void;
+  onDraftDocument?: (text: string, metadata: Record<string, string>) => void;
 }
 
 // Mock OCR results per document type
@@ -65,7 +66,7 @@ const DOC_LABELS: Record<ScannedDocType, string> = {
   KHAC: '📎 Tài liệu khác'
 };
 
-export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete, onAnalyzeContract }) => {
+export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete, onAnalyzeContract, onDraftDocument }) => {
   const [mode, setMode] = useState<'IDLE' | 'CAMERA' | 'PROCESSING' | 'RESULT'>('IDLE');
   const [selectedDocType, setSelectedDocType] = useState<ScannedDocType>('CAN_CUOC');
   const [progress, setProgress] = useState(0);
@@ -188,6 +189,12 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   const handleAnalyze = () => {
     if (result && onAnalyzeContract) {
       onAnalyzeContract(result.extractedText, result.extractedData);
+    }
+  };
+
+  const handleDraft = () => {
+    if (result && onDraftDocument) {
+      onDraftDocument(result.extractedText, result.extractedData);
     }
   };
 
@@ -337,18 +344,28 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
-            {onAnalyzeContract && (
-              <button
-                onClick={handleAnalyze}
-                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
-              >
-                <ChevronRight size={18} /> Phân Tích Rủi Ro
-              </button>
-            )}
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-3">
+              {onAnalyzeContract && (
+                <button
+                  onClick={handleAnalyze}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <Shield size={18} /> Phân Tích Rủi Ro
+                </button>
+              )}
+              {onDraftDocument && (
+                <button
+                  onClick={handleDraft}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
+                >
+                  <FileText size={18} /> Soạn Văn Bản
+                </button>
+              )}
+            </div>
             <button
               onClick={handleReset}
-              className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition-colors"
+              className="w-full py-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white font-bold rounded-xl transition-colors"
             >
               Quét Lại
             </button>

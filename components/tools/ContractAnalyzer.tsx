@@ -15,6 +15,32 @@ const RISK_COLORS = {
   LOW: { bg: 'bg-blue-500/15', border: 'border-blue-500/40', text: 'text-blue-400', badge: 'bg-blue-500', label: 'Thấp' }
 };
 
+// Helper for fuzzy text matching to ignore whitespaces and newlines
+function findTextMatch(fullText: string, searchSnippet: string): { start: number, end: number } | null {
+  if (!searchSnippet) return null;
+  const normalize = (str: string) => str.replace(/\s+/g, '').toLowerCase();
+  const normalizedSnippet = normalize(searchSnippet);
+  if (!normalizedSnippet) return null;
+
+  const map: number[] = [];
+  let normalizedFull = '';
+  for (let i = 0; i < fullText.length; i++) {
+    if (!/\\s/.test(fullText[i])) {
+      normalizedFull += fullText[i].toLowerCase();
+      map.push(i);
+    }
+  }
+
+  const matchIdx = normalizedFull.indexOf(normalizedSnippet);
+  if (matchIdx !== -1) {
+    return {
+      start: map[matchIdx],
+      end: map[matchIdx + normalizedSnippet.length - 1] + 1
+    };
+  }
+  return null;
+}
+
 export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocument, onBack }) => {
   // Input mode: 'choose' = initial screen, 'paste' = paste textarea, 'analyzing' = analysis view
   const [inputMode, setInputMode] = useState<'choose' | 'paste' | 'analyzing'>(initialDocument ? 'analyzing' : 'choose');
@@ -29,6 +55,14 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [apiError, setApiError] = useState(false);
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+
+  const LOADING_MESSAGES = [
+    "Đang phân tích cú pháp hợp đồng...",
+    "Đang đối chiếu với quy định pháp luật...",
+    "Đang nhận diện các điều khoản bất lợi...",
+    "Đang tổng hợp rủi ro & đề xuất sửa đổi..."
+  ];
 
   const docViewerRef = useRef<HTMLDivElement>(null);
   const riskRefs = useRef<Record<string, HTMLSpanElement | null>>({});
@@ -39,6 +73,18 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
+
+  // Cycle loading messages
+  useEffect(() => {
+    if (isAnalyzing) {
+      const interval = setInterval(() => {
+        setLoadingMsgIdx(prev => (prev + 1) % LOADING_MESSAGES.length);
+      }, 2500);
+      return () => clearInterval(interval);
+    } else {
+      setLoadingMsgIdx(0);
+    }
+  }, [isAnalyzing]);
 
   // Auto-analyze if initialDocument provided
   useEffect(() => {
@@ -250,15 +296,17 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
 
-    // Sort risks by their position in text
-    const sortedRisks = risks
-      .map(risk => ({ ...risk, idx: text.indexOf(risk.text) }))
-      .filter(r => r.idx !== -1)
-      .sort((a, b) => a.idx - b.idx);
+    // Sort risks by their position in text using fuzzy matching
+    const mappedRisks = risks.map(risk => {
+      const match = findTextMatch(text, risk.text);
+      return { ...risk, matchStart: match?.start ?? -1, matchEnd: match?.end ?? -1 };
+    }).filter(r => r.matchStart !== -1)
+      .sort((a, b) => a.matchStart - b.matchStart);
 
-    sortedRisks.forEach(risk => {
-      const startIdx = risk.idx;
-      if (startIdx < lastIndex) return; // Skip overlapping
+    mappedRisks.forEach(risk => {
+      const startIdx = risk.matchStart;
+      const endIdx = risk.matchEnd;
+      if (startIdx < lastIndex) return; // Skip overlapping for now
 
       // Add text before this risk
       if (startIdx > lastIndex) {
@@ -285,7 +333,7 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
             isActive ? 'ring-2 ring-yellow-400/50 shadow-lg shadow-yellow-500/20' : 'hover:ring-1 hover:ring-yellow-400/30'
           }`}
         >
-          {risk.text}
+          {text.slice(startIdx, endIdx)}
           {/* Risk badge */}
           <span className={`absolute -top-3 -right-1 w-5 h-5 ${colors.badge} rounded-full flex items-center justify-center shadow-lg`}>
             <AlertTriangle size={10} className="text-white" />
@@ -293,7 +341,7 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
         </span>
       );
 
-      lastIndex = startIdx + risk.text.length;
+      lastIndex = endIdx;
     });
 
     // Add remaining text
@@ -570,7 +618,9 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
                     <Scale size={20} className="text-emerald-500" />
                   </div>
                 </div>
-                <span className="text-sm text-emerald-400 font-bold animate-pulse">Đang quét rủi ro pháp lý...</span>
+                <span className="text-sm text-emerald-400 font-bold animate-pulse">
+                  {LOADING_MESSAGES[loadingMsgIdx]}
+                </span>
               </div>
             </div>
           )}

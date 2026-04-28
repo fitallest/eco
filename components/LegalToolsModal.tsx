@@ -10,11 +10,13 @@ import { ContractAnalyzer } from './tools/ContractAnalyzer';
 interface LegalToolsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onDraftDocument?: (text: string, metadata: Record<string, string>) => void;
+  userLevel?: string;
 }
 
 type ToolType = 'CALCULATOR' | 'DOC_ANALYZER' | 'MOCK_TRIAL' | 'VOICE_LAWYER' | 'DOC_SCANNER' | 'CONTRACT_ANALYZER' | 'MENU';
 
-export const LegalToolsModal: React.FC<LegalToolsModalProps> = ({ isOpen, onClose }) => {
+export const LegalToolsModal: React.FC<LegalToolsModalProps> = ({ isOpen, onClose, onDraftDocument, userLevel }) => {
   const [activeTool, setActiveTool] = useState<ToolType>('MENU');
   const [scannerOutput, setScannerOutput] = useState<{ text: string; metadata: Record<string, string> } | null>(null);
 
@@ -40,10 +42,11 @@ export const LegalToolsModal: React.FC<LegalToolsModalProps> = ({ isOpen, onClos
       case 'CALCULATOR': return <LegalCalculator />;
       case 'DOC_ANALYZER': return <DocumentAnalyzer />;
       case 'MOCK_TRIAL': return <MockTrial />;
-      case 'VOICE_LAWYER': return <VoiceLawyer />;
+      case 'VOICE_LAWYER': return <VoiceLawyer userLevel={userLevel} />;
       case 'DOC_SCANNER': return (
         <DocumentScanner
           onAnalyzeContract={handleScanToAnalyze}
+          onDraftDocument={onDraftDocument}
           onScanComplete={(doc) => console.log('Scanned:', doc)}
         />
       );

@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Volume2, Phone, PhoneOff, Activity } from 'lucide-react';
 import { sendMessageToGemini } from '../../services/geminiService';
+import { retrieveRelevantContext } from '../../services/ragService';
 
-export const VoiceLawyer: React.FC = () => {
+interface VoiceLawyerProps {
+  userLevel?: string;
+}
+
+export const VoiceLawyer: React.FC<VoiceLawyerProps> = ({ userLevel = 'Free' }) => {
   const [isCalling, setIsCalling] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -35,12 +40,25 @@ export const VoiceLawyer: React.FC = () => {
 
   const handleProcessVoiceInput = async (text: string) => {
       setIsListening(false);
-      // Call AI
+      
       try {
+          // RAG Integration
+          let ragContextText = "";
+          if (userLevel === 'Enterprise') {
+              const ragContext = await retrieveRelevantContext(text);
+              if (ragContext && ragContext.length > 0) {
+                  ragContextText = `
+[THÔNG TIN NỘI BỘ (RAG)]
+${ragContext.map(c => c.content).join('\n')}
+                  `;
+              }
+          }
+
           const prompt = `
           [CHẾ ĐỘ CUỘC GỌI KHẨN CẤP - VOICE CALL]
           Bạn đang nói chuyện điện thoại trực tiếp với khách hàng đang gặp rắc rối pháp lý (có thể đang hoảng loạn).
           Khách hàng vừa nói: "${text}"
+          ${ragContextText}
           
           NGUYÊN TẮC TRẢ LỜI (BẮT BUỘC):
           1. **KHÔNG DÙNG MARKDOWN** (Không in đậm, không gạch đầu dòng, không danh sách). Chỉ dùng văn bản thuần túy.
@@ -50,7 +68,7 @@ export const VoiceLawyer: React.FC = () => {
           
           Hãy trả lời ngay bây giờ như một luật sư đang cầm máy.
           `;
-          const response = await sendMessageToGemini(prompt, [], 'GENERAL', 'CONCISE', undefined, 'Gold');
+          const response = await sendMessageToGemini(prompt, [], 'GENERAL', 'CONCISE', undefined, userLevel as any);
           setAiResponse(response.text);
           speak(response.text);
       } catch (e) {
@@ -63,8 +81,18 @@ export const VoiceLawyer: React.FC = () => {
           setIsSpeaking(true);
           const utterance = new SpeechSynthesisUtterance(text);
           utterance.lang = 'vi-VN';
-          utterance.rate = 1.1;
-          utterance.onend = () => setIsSpeaking(false);
+          utterance.rate = 1.15; // Faster for urgency
+          utterance.onend = () => {
+              setIsSpeaking(false);
+              // Auto-resume listening for continuous hands-free conversation
+              if (recognitionRef.current && isCalling) {
+                  try {
+                      recognitionRef.current.start();
+                      setIsListening(true);
+                      setTranscript("Đang nghe...");
+                  } catch (e) {}
+              }
+          };
           synthesisRef.current.speak(utterance);
       }
   };
@@ -83,13 +111,21 @@ export const VoiceLawyer: React.FC = () => {
   };
 
   const toggleMic = () => {
+      // Interrupt AI if speaking
+      if (isSpeaking) {
+          synthesisRef.current.cancel();
+          setIsSpeaking(false);
+      }
+
       if (isListening) {
           recognitionRef.current?.stop();
           setIsListening(false);
       } else {
-          recognitionRef.current?.start();
-          setIsListening(true);
-          setTranscript("Đang nghe...");
+          try {
+              recognitionRef.current?.start();
+              setIsListening(true);
+              setTranscript("Đang nghe...");
+          } catch(e) {}
       }
   };
 
@@ -124,8 +160,18 @@ export const VoiceLawyer: React.FC = () => {
                   </p>
               </div>
 
-              <div className="w-32 h-32 rounded-full border-4 border-slate-800 flex items-center justify-center bg-slate-900 mb-8 relative">
-                  {isSpeaking ? <Volume2 size={48} className="text-emerald-400 animate-bounce"/> : <Activity size={48} className="text-slate-500"/>}
+              <div className="w-32 h-32 rounded-full border-4 border-slate-800 flex items-center justify-center bg-slate-900 mb-8 relative overflow-hidden">
+                  {isSpeaking ? (
+                      <div className="flex items-center justify-center gap-1.5 h-full w-full">
+                          <div className="w-2 h-12 bg-emerald-400 rounded-full animate-[wave_1s_ease-in-out_infinite]" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-20 bg-emerald-400 rounded-full animate-[wave_1s_ease-in-out_infinite]" style={{ animationDelay: '200ms' }}></div>
+                          <div className="w-2 h-16 bg-emerald-400 rounded-full animate-[wave_1s_ease-in-out_infinite]" style={{ animationDelay: '400ms' }}></div>
+                          <div className="w-2 h-24 bg-emerald-400 rounded-full animate-[wave_1s_ease-in-out_infinite]" style={{ animationDelay: '600ms' }}></div>
+                          <div className="w-2 h-10 bg-emerald-400 rounded-full animate-[wave_1s_ease-in-out_infinite]" style={{ animationDelay: '800ms' }}></div>
+                      </div>
+                  ) : (
+                      <Activity size={48} className="text-slate-500"/>
+                  )}
               </div>
 
               <div className="min-h-[60px] max-w-md">

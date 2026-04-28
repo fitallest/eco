@@ -18,9 +18,10 @@ NHIỆM VỤ: Đọc toàn bộ hợp đồng và tìm TẤT CẢ các điều k
 
 QUY TẮC BẮT BUỘC:
 1. Chỉ phân tích dựa trên NỘI DUNG HỢP ĐỒNG được cung cấp — KHÔNG bịa đặt.
-2. Mỗi rủi ro phải trích dẫn CHÍNH XÁC đoạn text gốc trong hợp đồng.
-3. Phải có căn cứ pháp luật Việt Nam (Điều, Khoản, Luật cụ thể).
-4. Xếp hạng rủi ro: HIGH (trái luật hoặc bất công nghiêm trọng), MEDIUM (bất lợi nhưng hợp pháp), LOW (cần lưu ý).
+2. Mỗi rủi ro phải trích dẫn CHÍNH XÁC TỪNG CHỮ (verbatim) một đoạn văn bản ngắn nhất chứa rủi ro (tối đa 30 từ) từ hợp đồng gốc. Tuyệt đối không tự ý thêm bớt khoảng trắng hay diễn đạt lại để UI có thể highlight chính xác.
+3. Phải có căn cứ pháp luật Việt Nam cụ thể (Ví dụ: Điều 428, Bộ luật Dân sự 2015). Nếu không chắc chắn, hãy ghi rõ "Theo nguyên tắc chung của pháp luật hợp đồng".
+4. Lập luận như một Luật sư thực thụ: Giải thích rõ hậu quả pháp lý và thiệt hại kinh tế thực tế nếu điều khoản này được giữ nguyên.
+5. Xếp hạng rủi ro: HIGH (trái luật hoặc bất công nghiêm trọng), MEDIUM (bất lợi nhưng hợp pháp), LOW (cần lưu ý).
 
 TRẢ VỀ JSON THUẦN TÚY (không markdown, không backtick), theo format:
 {
@@ -45,7 +46,7 @@ TRẢ VỀ JSON THUẦN TÚY (không markdown, không backtick), theo format:
       try {
         const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         const completion = await client.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4o',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: `Phân tích hợp đồng sau:\n\n${contractText}` }
@@ -65,7 +66,7 @@ TRẢ VỀ JSON THUẦN TÚY (không markdown, không backtick), theo format:
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         const response = await ai.models.generateContent({
-          model: 'gemini-flash-latest',
+          model: 'gemini-1.5-pro-latest',
           contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nPhân tích hợp đồng sau:\n\n${contractText}` }] }],
           config: { temperature: 0.1, responseMimeType: 'application/json' }
         });

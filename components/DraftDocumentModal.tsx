@@ -47,6 +47,25 @@ export const DraftDocumentModal: React.FC<DraftDocumentModalProps> = ({
             
             {selectedDoc ? (
                 <div className="p-6 overflow-y-auto custom-scrollbar">
+                    {/* OCR Data Alert */}
+                    {Object.keys(formData).filter(k => !selectedDoc.fields?.find(f => f.id === k)).length > 0 && (
+                        <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                            <h3 className="text-emerald-400 font-bold text-sm mb-2 flex items-center gap-2">
+                                <Cpu size={16} /> Dữ liệu bóc tách từ ảnh (OCR)
+                            </h3>
+                            <div className="grid grid-cols-2 gap-2">
+                                {Object.keys(formData)
+                                    .filter(k => !selectedDoc.fields?.find(f => f.id === k))
+                                    .map(key => (
+                                        <div key={key} className="text-xs">
+                                            <span className="text-slate-500">{key}:</span> <span className="text-white font-mono">{formData[key]}</span>
+                                        </div>
+                                    ))}
+                            </div>
+                            <p className="text-[10px] text-emerald-500 mt-2 italic">AI sẽ tự động sử dụng các thông tin này để soạn thảo văn bản.</p>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         {selectedDoc.fields?.map((field) => (
                             <div key={field.id} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
@@ -89,8 +108,21 @@ export const DraftDocumentModal: React.FC<DraftDocumentModalProps> = ({
                     </div>
                 </div>
             ) : (
-                <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                    {LEGAL_DOCUMENTS.map((doc) => {
+                <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar">
+                    {/* Global OCR Alert */}
+                    {Object.keys(formData).length > 0 && (
+                        <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-start gap-3">
+                            <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-500 shrink-0">
+                                <Cpu size={20} />
+                            </div>
+                            <div>
+                                <h3 className="text-emerald-400 font-bold text-sm mb-1">Đã nhận dữ liệu từ Máy Quét</h3>
+                                <p className="text-xs text-slate-300">Có {Object.keys(formData).length} trường thông tin được bóc tách. Chọn loại văn bản cần soạn thảo bên dưới, AI sẽ tự động điền dữ liệu này vào biểu mẫu.</p>
+                            </div>
+                        </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                        {LEGAL_DOCUMENTS.map((doc) => {
                         const Icon = doc.icon;
                         const canAfford = userCredits >= doc.price || userLevel === 'Enterprise';
                         return (

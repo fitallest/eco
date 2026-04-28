@@ -152,6 +152,7 @@ export const DraftDocumentModal: React.FC<DraftDocumentModalProps> = ({
                         );
                     })}
                 </div>
+                </div>
             )}
         </div>
     </div>

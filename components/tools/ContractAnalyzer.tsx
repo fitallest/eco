@@ -433,17 +433,17 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
 
             {/* Upload */}
             <label
-              className="group flex items-center gap-4 p-5 bg-slate-900/50 border border-slate-800 rounded-xl hover:border-blue-500/40 hover:bg-blue-500/5 transition-all text-left cursor-pointer"
+              className="group relative flex items-center gap-4 p-5 bg-slate-900/50 border border-slate-800 rounded-xl hover:border-blue-500/40 hover:bg-blue-500/5 transition-all text-left cursor-pointer overflow-hidden"
             >
-              <input type="file" accept=".txt,.doc,.docx,.pdf,.rtf" className="hidden" onChange={handleFileUpload} onClick={(e) => { (e.target as HTMLInputElement).value = ''; }} />
-              <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center group-hover:bg-blue-500/20 transition-colors shrink-0">
+              <input type="file" accept=".txt,.doc,.docx,.pdf,.rtf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={handleFileUpload} onClick={(e) => { (e.target as HTMLInputElement).value = ''; }} />
+              <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center group-hover:bg-blue-500/20 transition-colors shrink-0 relative z-0">
                 <Upload size={22} className="text-blue-400" />
               </div>
-              <div>
+              <div className="relative z-0">
                 <h3 className="font-bold text-white group-hover:text-blue-400 transition-colors">Upload file hợp đồng</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Hỗ trợ .txt, .doc, .docx (đọc dạng text)</p>
               </div>
-              <ArrowRight size={18} className="text-slate-600 group-hover:text-blue-400 ml-auto transition-colors" />
+              <ArrowRight size={18} className="text-slate-600 group-hover:text-blue-400 ml-auto transition-colors relative z-0" />
             </label>
 
             {/* Demo */}

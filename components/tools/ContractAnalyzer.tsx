@@ -95,11 +95,9 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
 
   // Handle file upload (.txt, .doc, .docx text extraction)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const target = e.target;
+    const file = target.files?.[0];
     if (!file) return;
-    
-    // Alert immediately to provide feedback
-    // alert(`Đang xử lý file: ${file.name}`);
 
     const checkAndAnalyze = (text: string) => {
       if (text && text.trim().length > 20) {
@@ -109,11 +107,16 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
       } else {
         alert('Nội dung file quá ngắn hoặc không thể đọc được chữ (có thể là ảnh chụp hoặc PDF dạng ảnh). Vui lòng copy paste nội dung hoặc dùng chức năng Quét Ảnh.');
       }
-      // Reset input value to allow re-uploading the same file
-      e.target.value = '';
+      target.value = '';
     };
 
-    if (file.name.endsWith('.docx')) {
+    if (file.name.toLowerCase().endsWith('.doc')) {
+      alert('Định dạng .doc cũ không được hỗ trợ để quét tự động. Vui lòng lưu file dưới dạng .docx hoặc copy paste nội dung.');
+      target.value = '';
+      return;
+    }
+
+    if (file.name.toLowerCase().endsWith('.docx')) {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         const arrayBuffer = ev.target?.result as ArrayBuffer;
@@ -124,7 +127,7 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
           } catch (err) {
             console.error('Lỗi khi đọc file .docx', err);
             alert('Không thể đọc được file .docx này. Vui lòng copy paste nội dung.');
-            e.target.value = '';
+            target.value = '';
           }
         }
       };

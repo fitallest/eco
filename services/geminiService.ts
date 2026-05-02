@@ -39,7 +39,7 @@ export const sendMessageToGemini = async (
       if (errorData && errorData.text) {
         return { text: errorData.text, source: 'OPENAI_DIRECT' };
       }
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`Máy chủ trả về lỗi ${response.status}`);
     }
 
     if (!response.body) {

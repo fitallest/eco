@@ -80,6 +80,9 @@ async function startServer() {
               return res.status(402).json({ text: "Bạn đã hết điểm pháp lý. Vui lòng nạp thêm để tiếp tục sử dụng." });
           } else if (err.message === 'UNAUTHORIZED') {
               return res.status(401).json({ text: "Vui lòng đăng nhập để sử dụng tính năng này." });
+          } else {
+              console.error('[Tollgate Gemini] Error:', err.message);
+              return res.status(500).json({ text: `Lỗi xác thực tài khoản: ${err.message}` });
           }
       }
 
@@ -254,6 +257,9 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
               return res.status(402).json({ text: "Bạn đã hết điểm pháp lý. Vui lòng nạp thêm để tiếp tục sử dụng." });
           } else if (err.message === 'UNAUTHORIZED') {
               return res.status(401).json({ text: "Vui lòng đăng nhập để sử dụng tính năng này." });
+          } else {
+              console.error('[Tollgate OpenAI] Error:', err.message);
+              return res.status(500).json({ text: `Lỗi xác thực tài khoản: ${err.message}` });
           }
       }
 

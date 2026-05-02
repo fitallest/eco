@@ -16,6 +16,11 @@ export default async function handler(req: any, res: any) {
             return res.status(402).json({ text: "Bạn đã hết điểm pháp lý. Vui lòng nạp thêm để tiếp tục sử dụng." });
         } else if (err.message === 'UNAUTHORIZED') {
             return res.status(401).json({ text: "Vui lòng đăng nhập để sử dụng tính năng này." });
+        } else if (err.message === 'USER_NOT_FOUND') {
+            return res.status(404).json({ text: "Không tìm thấy hồ sơ tài khoản. Vui lòng thử tải lại trang hoặc đăng xuất và đăng nhập lại." });
+        } else {
+            console.error("Credit deduction error:", err);
+            return res.status(500).json({ text: "Lỗi hệ thống khi kiểm tra tài khoản. Vui lòng thử lại sau." });
         }
     }
 

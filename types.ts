@@ -43,6 +43,9 @@ export interface Message {
     source?: 'SPECIALIZED_KB' | 'GENERAL_AI'; // Track where the answer came from
     docName?: string;
     type?: string;
+    ragInjected?: boolean;
+    ragDocs?: string[];
+    [key: string]: any;
   };
 }
 

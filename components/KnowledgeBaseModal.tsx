@@ -19,8 +19,9 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, 
     }
   }, [isOpen]);
 
-  const loadDocuments = () => {
-    setDocuments(getAllDocuments());
+  const loadDocuments = async () => {
+    const docs = await getAllDocuments();
+    setDocuments(docs);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,9 +55,9 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, 
     e.target.value = ''; // reset
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Bạn có chắc muốn xóa tài liệu này khỏi Knowledge Base?')) {
-      deleteDocument(id);
+      await deleteDocument(id);
       loadDocuments();
     }
   };

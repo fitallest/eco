@@ -20,7 +20,8 @@ export default async function handler(req: any, res: any) {
     });
 
     res.status(200).json({
-      embedding: response.data[0].embedding
+      embedding: response.data[0].embedding,
+      embeddings: response.data.map(d => d.embedding)
     });
 
   } catch (error: any) {

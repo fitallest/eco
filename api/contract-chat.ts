@@ -25,8 +25,6 @@ QUY TẮC:
 NỘI DUNG HỢP ĐỒNG ĐANG PHÂN TÍCH:
 ${contractText || 'Không có hợp đồng.'}`;
 
-    let answer = '';
-
     // Try OpenAI first
     if (process.env.OPENAI_API_KEY) {
       try {
@@ -41,26 +39,45 @@ ${contractText || 'Không có hợp đồng.'}`;
         }
         messages.push({ role: 'user', content: question });
 
-        const completion = await client.chat.completions.create({
+        const stream = await client.chat.completions.create({
           model: 'gpt-4o',
           messages,
           temperature: 0.2,
+          stream: true,
         });
-        answer = completion.choices[0]?.message?.content || 'Không có phản hồi.';
+
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders();
+
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content || "";
+          if (content) {
+            res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
+          }
+        }
+        res.write(`data: [DONE]\n\n`);
+        return res.end();
       } catch (openaiErr: any) {
         console.error('OpenAI contract-chat error, trying Gemini:', openaiErr.message);
+        if (res.headersSent) {
+          res.write(`data: ${JSON.stringify({ text: "\n\n[Lỗi kết nối OpenAI]" })}\n\n`);
+          return res.end();
+        }
       }
     }
 
     // Fallback to Gemini
-    if (!answer && process.env.GEMINI_API_KEY) {
+    if (process.env.GEMINI_API_KEY) {
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         const historyParts = (chatHistory || []).map((m: any) => ({
           role: m.role === 'model' ? 'model' : 'user',
           parts: [{ text: m.text || '' }]
         }));
-        const response = await ai.models.generateContent({
+        
+        const responseStream = await ai.models.generateContentStream({
           model: 'gemini-1.5-pro-latest',
           contents: [
             ...historyParts,
@@ -68,18 +85,41 @@ ${contractText || 'Không có hợp đồng.'}`;
           ],
           config: { systemInstruction: systemPrompt, temperature: 0.2 }
         });
-        answer = response.text || 'Không có phản hồi.';
+
+        if (!res.headersSent) {
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          res.flushHeaders();
+        }
+
+        for await (const chunk of responseStream) {
+          if (chunk.text) {
+            res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+          }
+        }
+        res.write(`data: [DONE]\n\n`);
+        return res.end();
       } catch (geminiErr: any) {
         console.error('Gemini contract-chat error:', geminiErr.message);
+        if (res.headersSent) {
+           res.write(`data: ${JSON.stringify({ text: "\n\n[Lỗi kết nối Gemini]" })}\n\n`);
+           return res.end();
+        }
       }
     }
 
-    if (!answer) throw new Error('Không có API key nào khả dụng hoặc lỗi API.');
-
-    res.status(200).json({ answer, source: process.env.OPENAI_API_KEY ? 'OPENAI' : 'GEMINI' });
+    if (!res.headersSent) {
+      throw new Error('Không có API key nào khả dụng hoặc lỗi API.');
+    }
 
   } catch (error: any) {
     console.error('Contract Chat Error:', error);
-    res.status(500).json({ error: `Lỗi: ${error.message}` });
+    if (!res.headersSent) {
+      res.status(500).json({ error: `Lỗi: ${error.message}` });
+    } else {
+      res.write(`data: ${JSON.stringify({ text: `\n\n[Lỗi: ${error.message}]` })}\n\n`);
+      res.end();
+    }
   }
 }

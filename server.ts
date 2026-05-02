@@ -3,6 +3,8 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
+import { createClient } from "@supabase/supabase-js";
+import { handleTopup, handleAdminAdjust, handleGetBalance } from "./api/wallet";
 
 try { process.loadEnvFile(); } catch (e) {}
 
@@ -14,9 +16,73 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+  const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+
+  // Service-role client: bypasses RLS for credit deductions (server-side only)
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseKey;
+  const supabaseAdmin = (supabaseUrl && serviceKey)
+      ? createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+      : null;
+
+  async function checkAndDeductCredits(req: any, amount: number = 1) {
+      if (!supabaseUrl || !supabaseKey) return null; // Skip if Supabase not configured
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader) throw new Error('UNAUTHORIZED');
+      const token = authHeader.split(' ')[1];
+      if (!token) throw new Error('UNAUTHORIZED');
+
+      // Use anon client to verify JWT
+      const scopedSupabase = createClient(supabaseUrl, supabaseKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false }
+      });
+
+      const { data: { user }, error: authError } = await scopedSupabase.auth.getUser();
+      if (authError || !user) throw new Error('UNAUTHORIZED');
+
+      // Use admin client to read/write credits (bypasses RLS)
+      const dbClient = supabaseAdmin || scopedSupabase;
+      const { data: userData, error: fetchError } = await dbClient
+          .from('users')
+          .select('credits, role')
+          .eq('id', user.id)
+          .single();
+
+      if (fetchError || !userData) throw new Error('USER_NOT_FOUND');
+
+      if (userData.role !== 'ADMIN' && userData.credits < amount) {
+          throw new Error('INSUFFICIENT_CREDITS');
+      }
+
+      if (userData.role !== 'ADMIN') {
+          const newCredits = userData.credits - amount;
+          const { error: updateErr } = await dbClient
+              .from('users')
+              .update({ credits: newCredits })
+              .eq('id', user.id);
+          if (updateErr) console.error('[Tollgate] Credit update error:', updateErr.message);
+      }
+
+      return user;
+  }
+
   // API routes FIRST
   app.post("/api/gemini", async (req, res) => {
     try {
+      // Tollgate: Check and deduct credits
+      const cost = req.body.agentConfig?.metadata?.type === 'DRAFT_DOCUMENT' ? 50 : 1; 
+      try {
+          await checkAndDeductCredits(req, cost);
+      } catch (err: any) {
+          if (err.message === 'INSUFFICIENT_CREDITS') {
+              return res.status(402).json({ text: "Bạn đã hết điểm pháp lý. Vui lòng nạp thêm để tiếp tục sử dụng." });
+          } else if (err.message === 'UNAUTHORIZED') {
+              return res.status(401).json({ text: "Vui lòng đăng nhập để sử dụng tính năng này." });
+          }
+      }
+
       const { prompt, history, agentType, responseStyle, agentConfig, userLevel, attachment } = req.body;
       
       if (!process.env.GEMINI_API_KEY) throw new Error("Thieu GEMINI_API_KEY trong Environment Variables");
@@ -77,10 +143,10 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
 
 ---
 💡 GỢI Ý TIẾP THEO
-(Đây là các câu lệnh tắt trên giao diện để người dùng bấm vào. BẮT BUỘC phải là LỜI CỦA NGƯỜI DÙNG yêu cầu AI)
-- [Gợi ý 1: "Hãy soạn đơn tố cáo cho tôi"] (KHÔNG ĐƯỢC VIẾT: "Bạn có muốn soạn đơn không?")
-- [Gợi ý 2: "Thủ tục này mất bao lâu?"] (KHÔNG ĐƯỢC VIẾT: "Tôi có thể giải thích về thủ tục...")
-- [Gợi ý 3: "Chi phí thuê luật sư là bao nhiêu?"]
+(Đây là các câu lệnh tắt trên giao diện để người dùng bấm vào. BẮT BUỘC phải là LỜI CỦA NGƯỜI DÙNG yêu cầu AI. TUYỆT ĐỐI KHÔNG thêm tiền tố như "Gợi ý 1:", không dùng ngoặc vuông hay ngoặc kép)
+- Hãy soạn đơn tố cáo cho tôi
+- Thủ tục này mất bao lâu?
+- Chi phí thuê luật sư là bao nhiêu?
 `;
 
       const STYLE_INSTRUCTIONS: Record<string, string> = {
@@ -142,7 +208,7 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
           { role: 'user', parts: currentParts }
       ];
 
-      const response = await ai.models.generateContent({
+      const responseStream = await ai.models.generateContentStream({
           model: modelName,
           contents: contents,
           config: {
@@ -152,10 +218,18 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
           }
       });
 
-      res.json({ 
-          text: response.text || "Hệ thống không phản hồi.", 
-          source: 'GEMINI_DIRECT' 
-      });
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      for await (const chunk of responseStream) {
+        if (chunk.text) {
+          res.write(`data: ${JSON.stringify({ text: chunk.text, source: 'GEMINI_DIRECT' })}\n\n`);
+        }
+      }
+      res.write(`data: [DONE]\n\n`);
+      res.end();
 
     } catch (error: any) {
       console.error(`Gemini API Error:`, error);
@@ -171,6 +245,18 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
   // ── OpenAI (ChatGPT) endpoint ─────────────────────────────────────
   app.post("/api/openai", async (req, res) => {
     try {
+      // Tollgate: Check and deduct credits
+      const cost = req.body.agentConfig?.metadata?.type === 'DRAFT_DOCUMENT' ? 50 : 1; 
+      try {
+          await checkAndDeductCredits(req, cost);
+      } catch (err: any) {
+          if (err.message === 'INSUFFICIENT_CREDITS') {
+              return res.status(402).json({ text: "Bạn đã hết điểm pháp lý. Vui lòng nạp thêm để tiếp tục sử dụng." });
+          } else if (err.message === 'UNAUTHORIZED') {
+              return res.status(401).json({ text: "Vui lòng đăng nhập để sử dụng tính năng này." });
+          }
+      }
+
       const { prompt, history, agentType, responseStyle, agentConfig, userLevel } = req.body;
 
       if (!process.env.OPENAI_API_KEY) throw new Error("Thiếu OPENAI_API_KEY trong Environment Variables");
@@ -214,6 +300,9 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
 ⚖️ KHUYẾN NGHỊ & RỦI RO
 ---
 💡 GỢI Ý TIẾP THEO
+(BẮT BUỘC là câu hỏi/yêu cầu trực tiếp của người dùng. KHÔNG có "Gợi ý 1:", KHÔNG có ngoặc kép/ngoặc vuông)
+- Hãy soạn đơn tố cáo cho tôi
+- Thủ tục này mất bao lâu?
 `;
 
       const STYLE_INSTRUCTIONS: Record<string, string> = {
@@ -249,16 +338,26 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
       }
       messages.push({ role: 'user', content: prompt });
 
-      const completion = await client.chat.completions.create({
+      const stream = await client.chat.completions.create({
         model: modelName,
         messages,
         temperature: 0.3,
+        stream: true,
       });
 
-      res.json({
-        text: completion.choices[0]?.message?.content || "Hệ thống không phản hồi.",
-        source: 'OPENAI_DIRECT'
-      });
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ text: content, source: 'OPENAI_DIRECT' })}\n\n`);
+        }
+      }
+      res.write(`data: [DONE]\n\n`);
+      res.end();
 
     } catch (error: any) {
       console.error(`OpenAI API Error:`, error);
@@ -397,25 +496,43 @@ ${contractText || 'Không có hợp đồng.'}`;
           }
           messages.push({ role: 'user', content: question });
 
-          const completion = await client.chat.completions.create({
+          const stream = await client.chat.completions.create({
             model: 'gpt-4o-mini',
             messages,
             temperature: 0.2,
+            stream: true,
           });
-          answer = completion.choices[0]?.message?.content || 'Không có phản hồi.';
+
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          res.flushHeaders();
+
+          for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || "";
+            if (content) {
+              res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
+            }
+          }
+          res.write(`data: [DONE]\n\n`);
+          return res.end();
         } catch (openaiErr: any) {
           console.error('OpenAI contract-chat error, trying Gemini:', openaiErr.message);
+          if (res.headersSent) {
+            res.write(`data: ${JSON.stringify({ text: "\n\n[Lỗi kết nối OpenAI]" })}\n\n`);
+            return res.end();
+          }
         }
       }
 
       // Fallback to Gemini
-      if (!answer && process.env.GEMINI_API_KEY) {
+      if (process.env.GEMINI_API_KEY) {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         const historyParts = (chatHistory || []).map((m: any) => ({
           role: m.role === 'model' ? 'model' : 'user',
           parts: [{ text: m.text || '' }]
         }));
-        const response = await ai.models.generateContent({
+        const responseStream = await ai.models.generateContentStream({
           model: 'gemini-flash-latest',
           contents: [
             ...historyParts,
@@ -423,12 +540,24 @@ ${contractText || 'Không có hợp đồng.'}`;
           ],
           config: { systemInstruction: systemPrompt, temperature: 0.2 }
         });
-        answer = response.text || 'Không có phản hồi.';
+
+        if (!res.headersSent) {
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          res.flushHeaders();
+        }
+
+        for await (const chunk of responseStream) {
+          if (chunk.text) {
+            res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+          }
+        }
+        res.write(`data: [DONE]\n\n`);
+        return res.end();
       }
 
-      if (!answer) throw new Error('Không có API key nào khả dụng.');
-
-      res.json({ answer, source: process.env.OPENAI_API_KEY ? 'OPENAI' : 'GEMINI' });
+      if (!res.headersSent) throw new Error('Không có API key nào khả dụng.');
 
     } catch (error: any) {
       console.error('Contract Chat Error:', error);
@@ -451,7 +580,8 @@ ${contractText || 'Không có hợp đồng.'}`;
       });
 
       res.status(200).json({
-        embedding: response.data[0].embedding
+        embedding: response.data[0].embedding,
+        embeddings: response.data.map(d => d.embedding)
       });
     } catch (error: any) {
       console.error('Embeddings Error:', error);
@@ -459,7 +589,131 @@ ${contractText || 'Không có hợp đồng.'}`;
     }
   });
 
-  // Vite middleware for development
+  // ── OCR Vision endpoint ──────────────────────────────────────────
+  app.post("/api/ocr", async (req, res) => {
+    try {
+      const { imageBase64, mimeType, docTypeHint } = req.body;
+      if (!imageBase64) {
+        return res.status(400).json({ error: 'Thiếu dữ liệu ảnh.' });
+      }
+
+      const ocrPrompt = `Bạn là ECOLAW.AI OCR Engine chuyên dụng. Phân tích ảnh tài liệu pháp lý này.
+
+LOẠI TÀI LIỆU GỢI Ý: ${docTypeHint || 'Chưa xác định'}
+
+NHIỆM VỤ:
+1. Đọc và trích xuất TOÀN BỘ nội dung chữ có trong ảnh (OCR).
+2. Tự động nhận diện chính xác loại tài liệu: Sổ đỏ (SO_DO), CCCD (CAN_CUOC), Giấy khai sinh (GIAY_KHAI_SINH), Hợp đồng (HOP_DONG), hoặc Khác (KHAC).
+3. Bóc tách tất cả các trường dữ liệu quan trọng thành các cặp key-value tiếng Việt.
+
+QUY TẮC:
+- Trả về DUY NHẤT một JSON object, không có text nào khác bên ngoài JSON.
+- Không wrap trong markdown code block.
+- Nếu ảnh mờ hoặc không đọc được, vẫn trả JSON với confidence thấp.
+
+FORMAT JSON BẮT BUỘC:
+{
+  "detectedType": "SO_DO",
+  "fullText": "Toàn bộ nội dung text đọc được...",
+  "fields": {
+    "Số sổ": "BV 123456",
+    "Chủ sở hữu": "NGUYỄN VĂN A"
+  },
+  "confidence": 0.95
+}`;
+
+      let result: any = null;
+
+      // Try Gemini first (better at vision tasks)
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+          const response = await ai.models.generateContent({
+            model: 'gemini-2.0-flash',
+            contents: [{
+              role: 'user',
+              parts: [
+                { text: ocrPrompt },
+                {
+                  inlineData: {
+                    mimeType: mimeType || 'image/jpeg',
+                    data: imageBase64
+                  }
+                }
+              ]
+            }],
+            config: {
+              temperature: 0.1,
+              responseMimeType: 'application/json'
+            }
+          });
+
+          const raw = response.text || '{}';
+          try {
+            result = JSON.parse(raw);
+          } catch {
+            const jsonMatch = raw.match(/\{[\s\S]*\}/);
+            if (jsonMatch) result = JSON.parse(jsonMatch[0]);
+          }
+        } catch (geminiErr: any) {
+          console.error('Gemini OCR Error:', geminiErr.message);
+        }
+      }
+
+      // Fallback to OpenAI GPT-4o Vision
+      if (!result && process.env.OPENAI_API_KEY) {
+        try {
+          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          const completion = await client.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'text', text: ocrPrompt },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`,
+                    detail: 'high'
+                  }
+                }
+              ]
+            }],
+            temperature: 0.1,
+            response_format: { type: 'json_object' }
+          });
+          const raw = completion.choices[0]?.message?.content || '{}';
+          result = JSON.parse(raw);
+        } catch (openaiErr: any) {
+          console.error('OpenAI OCR Error:', openaiErr.message);
+        }
+      }
+
+      if (!result) throw new Error('Không có API key nào khả dụng hoặc lỗi API.');
+
+      // Normalize
+      const ocrResult = {
+        detectedType: ['SO_DO', 'CAN_CUOC', 'GIAY_KHAI_SINH', 'HOP_DONG', 'KHAC'].includes(result.detectedType)
+          ? result.detectedType : 'KHAC',
+        fullText: result.fullText || '',
+        fields: result.fields || {},
+        confidence: typeof result.confidence === 'number' ? result.confidence : 0.8,
+        source: process.env.GEMINI_API_KEY ? 'GEMINI_VISION' : 'OPENAI_VISION'
+      };
+
+      res.json(ocrResult);
+
+    } catch (error: any) {
+      console.error('OCR API Error:', error);
+      res.status(500).json({ error: `Lỗi OCR: ${error.message}` });
+    }
+  });
+
+  // ── Wallet API routes ────────────────────────────────────────────
+  app.get("/api/wallet/balance", handleGetBalance);
+  app.post("/api/wallet/topup", handleTopup);
+  app.post("/api/wallet/admin-adjust", handleAdminAdjust);
+
   if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const vite = await createViteServer({
       server: { middlewareMode: true },

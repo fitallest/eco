@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { checkAndDeductCredits } from "./auth";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -6,6 +7,18 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    // Tollgate: Check and deduct credits
+    const cost = req.body.agentConfig?.metadata?.type === 'DRAFT_DOCUMENT' ? 50 : 1; 
+    try {
+        await checkAndDeductCredits(req, cost);
+    } catch (err: any) {
+        if (err.message === 'INSUFFICIENT_CREDITS') {
+            return res.status(402).json({ text: "Bạn đã hết điểm pháp lý. Vui lòng nạp thêm để tiếp tục sử dụng." });
+        } else if (err.message === 'UNAUTHORIZED') {
+            return res.status(401).json({ text: "Vui lòng đăng nhập để sử dụng tính năng này." });
+        }
+    }
+
     const { prompt, history, agentType, responseStyle, agentConfig, userLevel } = req.body;
 
     if (!process.env.OPENAI_API_KEY) throw new Error("Thiếu OPENAI_API_KEY trong Environment Variables");
@@ -66,10 +79,10 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
 
 ---
 💡 GỢI Ý TIẾP THEO
-(Đây là các câu lệnh tắt trên giao diện để người dùng bấm vào. BẮT BUỘC phải là LỜI CỦA NGƯỜI DÙNG yêu cầu AI)
-- [Gợi ý 1: "Hãy soạn đơn tố cáo cho tôi"] (KHÔNG ĐƯỢC VIẾT: "Bạn có muốn soạn đơn không?")
-- [Gợi ý 2: "Thủ tục này mất bao lâu?"] (KHÔNG ĐƯỢC VIẾT: "Tôi có thể giải thích về thủ tục...")
-- [Gợi ý 3: "Chi phí thuê luật sư là bao nhiêu?"]
+(Đây là các câu lệnh tắt trên giao diện để người dùng bấm vào. BẮT BUỘC phải là LỜI CỦA NGƯỜI DÙNG yêu cầu AI. TUYỆT ĐỐI KHÔNG thêm tiền tố như "Gợi ý 1:", không dùng ngoặc vuông hay ngoặc kép)
+- Hãy soạn đơn tố cáo cho tôi
+- Thủ tục này mất bao lâu?
+- Chi phí thuê luật sư là bao nhiêu?
 `;
 
     const STYLE_INSTRUCTIONS: Record<string, string> = {
@@ -127,18 +140,26 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
     // Add current user prompt
     messages.push({ role: 'user', content: prompt });
 
-    const completion = await client.chat.completions.create({
+    const stream = await client.chat.completions.create({
       model: modelName,
       messages,
       temperature: 0.3,
+      stream: true,
     });
 
-    const text = completion.choices[0]?.message?.content || "Hệ thống không phản hồi.";
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
 
-    res.status(200).json({
-      text,
-      source: 'OPENAI_DIRECT'
-    });
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || "";
+      if (content) {
+        res.write(`data: ${JSON.stringify({ text: content, source: 'OPENAI_DIRECT' })}\n\n`);
+      }
+    }
+    res.write(`data: [DONE]\n\n`);
+    res.end();
 
   } catch (error: any) {
     console.error(`OpenAI API Error:`, error);
@@ -146,9 +167,14 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
     if (error.message?.includes('API key')) errorMsg = "Lỗi API Key OpenAI.";
     else if (error.status === 429) errorMsg = "Hệ thống đang bận (Rate Limit).";
 
-    res.status(500).json({
-      text: `⚠️ LỖI HỆ THỐNG\n\n${errorMsg}`,
-      source: 'OPENAI_DIRECT'
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        text: `⚠️ LỖI HỆ THỐNG\n\n${errorMsg}`,
+        source: 'OPENAI_DIRECT'
+      });
+    } else {
+      res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ LỖI HỆ THỐNG\n\n${errorMsg}` })}\n\n`);
+      res.end();
+    }
   }
 }

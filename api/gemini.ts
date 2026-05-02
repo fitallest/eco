@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { checkAndDeductCredits } from "./auth";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -6,6 +7,18 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    // Tollgate: Check and deduct credits
+    const cost = req.body.agentConfig?.metadata?.type === 'DRAFT_DOCUMENT' ? 50 : 1; 
+    try {
+        await checkAndDeductCredits(req, cost);
+    } catch (err: any) {
+        if (err.message === 'INSUFFICIENT_CREDITS') {
+            return res.status(402).json({ text: "Bạn đã hết điểm pháp lý. Vui lòng nạp thêm để tiếp tục sử dụng." });
+        } else if (err.message === 'UNAUTHORIZED') {
+            return res.status(401).json({ text: "Vui lòng đăng nhập để sử dụng tính năng này." });
+        }
+    }
+
     const { prompt, history, agentType, responseStyle, agentConfig, userLevel, attachment } = req.body;
     
     if (!process.env.GEMINI_API_KEY) throw new Error("Thieu GEMINI_API_KEY trong Environment Variables");
@@ -66,10 +79,10 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
 
 ---
 💡 GỢI Ý TIẾP THEO
-(Đây là các câu lệnh tắt trên giao diện để người dùng bấm vào. BẮT BUỘC phải là LỜI CỦA NGƯỜI DÙNG yêu cầu AI)
-- [Gợi ý 1: "Hãy soạn đơn tố cáo cho tôi"] (KHÔNG ĐƯỢC VIẾT: "Bạn có muốn soạn đơn không?")
-- [Gợi ý 2: "Thủ tục này mất bao lâu?"] (KHÔNG ĐƯỢC VIẾT: "Tôi có thể giải thích về thủ tục...")
-- [Gợi ý 3: "Chi phí thuê luật sư là bao nhiêu?"]
+(Đây là các câu lệnh tắt trên giao diện để người dùng bấm vào. BẮT BUỘC phải là LỜI CỦA NGƯỜI DÙNG yêu cầu AI. TUYỆT ĐỐI KHÔNG thêm tiền tố như "Gợi ý 1:", không dùng ngoặc vuông hay ngoặc kép)
+- Hãy soạn đơn tố cáo cho tôi
+- Thủ tục này mất bao lâu?
+- Chi phí thuê luật sư là bao nhiêu?
 `;
 
     const STYLE_INSTRUCTIONS: Record<string, string> = {

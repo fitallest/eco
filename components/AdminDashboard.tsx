@@ -14,15 +14,52 @@ interface AdminDashboardProps {
   onUpdateAgentConfigs: (newConfigs: Record<AgentType, AgentConfig>) => void;
   planConfigs: Record<UserLevel, PlanConfig>;
   onUpdatePlanConfigs: (newConfigs: Record<UserLevel, PlanConfig>) => void;
+  currentSession: any;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  users, onCommand, onDeleteUser, onUpdateUser, onAddUser, agentConfigs, onUpdateAgentConfigs, planConfigs, onUpdatePlanConfigs
+  users, onCommand, onDeleteUser, onUpdateUser, onAddUser, agentConfigs, onUpdateAgentConfigs, planConfigs, onUpdatePlanConfigs, currentSession
 }) => {
   const [activeTab, setActiveTab] = useState('OVERVIEW');
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
-  
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [creditAdjustLoading, setCreditAdjustLoading] = useState<string | null>(null);
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleCreditAdjust = async (targetUser: UserProfile, amount: number) => {
+    if (!currentSession?.access_token) {
+      showToast('Không có phiên đăng nhập Admin', 'error');
+      return;
+    }
+    setCreditAdjustLoading(targetUser.id);
+    try {
+      const res = await fetch('/api/wallet/admin-adjust', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession.access_token}`
+        },
+        body: JSON.stringify({ targetUserId: targetUser.id, amount, note: `Admin manual adjust ${amount > 0 ? '+' : ''}${amount}` })
+      });
+      const data = await res.json();
+      if (data.success) {
+        onUpdateUser({ ...targetUser, credits: data.credits });
+        showToast(`✅ Đã ${amount > 0 ? 'cộng' : 'trừ'} ${Math.abs(amount)} điểm cho ${targetUser.name}. Số dư mới: ${data.credits} CR`);
+      } else {
+        showToast(`❌ Lỗi: ${data.error}`, 'error');
+      }
+    } catch (err: any) {
+      showToast(`❌ Lỗi kết nối: ${err.message}`, 'error');
+    } finally {
+      setCreditAdjustLoading(null);
+    }
+  };
+
   // Edit User State
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
 
@@ -139,6 +176,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="flex h-screen bg-[#020617] text-slate-200 font-inter overflow-hidden">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-[100] px-5 py-3 rounded-xl shadow-2xl border text-sm font-bold animate-fade-in transition-all ${
+          toast.type === 'success'
+            ? 'bg-emerald-900/90 border-emerald-500/50 text-emerald-300'
+            : 'bg-red-900/90 border-red-500/50 text-red-300'
+        }`}>
+          {toast.msg}
+        </div>
+      )}
       <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col p-4 hidden md:flex">
         <div className="font-bold text-xl text-white mb-8 px-2">ADMIN<span className="text-emerald-500">.OS</span></div>
         <nav className="space-y-2">
@@ -322,9 +369,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                                 {u.status}
                                             </button>
                                         </td>
-                                        <td className="px-6 py-4 flex gap-2">
-                                            <button onClick={() => setEditingUser(u)} className="text-slate-400 hover:text-emerald-400 p-1 hover:bg-slate-800 rounded transition-colors" title="Chỉnh sửa"><Edit2 size={16}/></button>
-                                            <button onClick={() => onDeleteUser(u.id)} className="text-slate-400 hover:text-red-500 p-1 hover:bg-slate-800 rounded transition-colors" title="Xóa"><Trash2 size={16}/></button>
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => handleCreditAdjust(u, 10)}
+                                                    disabled={creditAdjustLoading === u.id || !u.id?.includes('-')}
+                                                    className="px-2 py-1 bg-emerald-900/30 hover:bg-emerald-700/40 text-emerald-400 text-xs font-bold rounded border border-emerald-800 transition-all disabled:opacity-40"
+                                                    title="Cộng 10 điểm"
+                                                >+10</button>
+                                                <button
+                                                    onClick={() => handleCreditAdjust(u, 100)}
+                                                    disabled={creditAdjustLoading === u.id || !u.id?.includes('-')}
+                                                    className="px-2 py-1 bg-emerald-900/30 hover:bg-emerald-700/40 text-emerald-400 text-xs font-bold rounded border border-emerald-800 transition-all disabled:opacity-40"
+                                                    title="Cộng 100 điểm"
+                                                >+100</button>
+                                                <button
+                                                    onClick={() => handleCreditAdjust(u, -10)}
+                                                    disabled={creditAdjustLoading === u.id || !u.id?.includes('-')}
+                                                    className="px-2 py-1 bg-red-900/30 hover:bg-red-700/40 text-red-400 text-xs font-bold rounded border border-red-800 transition-all disabled:opacity-40"
+                                                    title="Trừ 10 điểm"
+                                                >-10</button>
+                                                <button onClick={() => setEditingUser(u)} className="text-slate-400 hover:text-emerald-400 p-1 hover:bg-slate-800 rounded transition-colors ml-1"><Edit2 size={14}/></button>
+                                                <button onClick={() => onDeleteUser(u.id)} className="text-slate-400 hover:text-red-500 p-1 hover:bg-slate-800 rounded transition-colors"><Trash2 size={14}/></button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))

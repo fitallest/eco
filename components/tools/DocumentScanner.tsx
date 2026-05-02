@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, Upload, X, FileText, CheckCircle, Zap, ChevronRight, Eye, Smartphone } from 'lucide-react';
+import { Camera, Upload, X, FileText, CheckCircle, Zap, ChevronRight, Eye, Smartphone, Shield } from 'lucide-react';
 import { ScannedDocument, ScannedDocType } from '../../types';
 
 interface DocumentScannerProps {
@@ -141,35 +141,112 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     setMode('PROCESSING');
     setProgress(0);
 
+    const isDemo = imageData === 'demo';
+
     // Phase 1: Recognition
     setPhase('Đang nhận diện loại văn bản...');
     for (let i = 0; i <= 35; i++) {
-      await new Promise(r => setTimeout(r, 25));
+      await new Promise(r => setTimeout(r, isDemo ? 25 : 15));
       setProgress(i);
     }
 
-    // Phase 2: Extraction  
-    setPhase('Đang bóc tách chữ (OCR Engine)...');
-    for (let i = 35; i <= 70; i++) {
-      await new Promise(r => setTimeout(r, 30));
-      setProgress(i);
+    let extractedText = '';
+    let extractedData: Record<string, string> = {};
+    let confidence = 0.92 + Math.random() * 0.07;
+    let detectedType: ScannedDocType = selectedDocType;
+
+    if (isDemo) {
+      // Use mock data for demo only
+      setPhase('Đang bóc tách chữ (OCR Engine)...');
+      for (let i = 35; i <= 70; i++) {
+        await new Promise(r => setTimeout(r, 30));
+        setProgress(i);
+      }
+      setPhase('Đang ráp nối & xác minh dữ liệu...');
+      for (let i = 70; i <= 100; i++) {
+        await new Promise(r => setTimeout(r, 25));
+        setProgress(i);
+      }
+      const mockResult = MOCK_OCR_RESULTS[selectedDocType];
+      extractedText = mockResult.text;
+      extractedData = mockResult.data;
+    } else {
+      // Real AI OCR via dedicated /api/ocr endpoint
+      setPhase('Đang gửi ảnh tới AI Vision Engine...');
+      for (let i = 35; i <= 55; i++) {
+        await new Promise(r => setTimeout(r, 20));
+        setProgress(i);
+      }
+
+      try {
+        // Extract base64 data from data URL
+        const base64Match = imageData.match(/^data:(.*?);base64,(.*)$/);
+        const mimeType = base64Match ? base64Match[1] : 'image/jpeg';
+        const base64Data = base64Match ? base64Match[2] : imageData;
+
+        const docTypeHint = DOC_LABELS[selectedDocType];
+
+        setPhase('Đang bóc tách chữ (AI Vision)...');
+        for (let i = 55; i <= 65; i++) {
+          await new Promise(r => setTimeout(r, 20));
+          setProgress(i);
+        }
+
+        const resp = await fetch('/api/ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64Data,
+            mimeType: mimeType,
+            docTypeHint: docTypeHint
+          })
+        });
+
+        setPhase('Đang phân tích kết quả...');
+        for (let i = 65; i <= 80; i++) {
+          await new Promise(r => setTimeout(r, 20));
+          setProgress(i);
+        }
+
+        if (resp.ok) {
+          const data = await resp.json();
+
+          setPhase('Đang ráp nối & xác minh dữ liệu...');
+          for (let i = 80; i <= 95; i++) {
+            await new Promise(r => setTimeout(r, 15));
+            setProgress(i);
+          }
+
+          extractedText = data.fullText || '';
+          extractedData = data.fields || {};
+          confidence = data.confidence || 0.8;
+
+          if (data.detectedType && ['SO_DO', 'CAN_CUOC', 'GIAY_KHAI_SINH', 'HOP_DONG', 'KHAC'].includes(data.detectedType)) {
+            detectedType = data.detectedType as ScannedDocType;
+          }
+        } else {
+          const errData = await resp.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(errData.error || 'API response not OK');
+        }
+      } catch (err) {
+        console.error('AI OCR Error:', err);
+        // Fallback to mock data if API fails
+        const mockResult = MOCK_OCR_RESULTS[selectedDocType];
+        extractedText = mockResult.text;
+        extractedData = { ...mockResult.data, '⚠️ Lưu ý': 'Kết quả mẫu — API OCR không khả dụng' };
+        confidence = 0.5;
+      }
+
+      setProgress(100);
     }
 
-    // Phase 3: Assembly
-    setPhase('Đang ráp nối & xác minh dữ liệu...');
-    for (let i = 70; i <= 100; i++) {
-      await new Promise(r => setTimeout(r, 25));
-      setProgress(i);
-    }
-
-    const mockResult = MOCK_OCR_RESULTS[selectedDocType];
     const doc: ScannedDocument = {
       id: Date.now().toString(),
-      type: selectedDocType,
-      rawImage: imageData,
-      extractedText: mockResult.text,
-      extractedData: mockResult.data,
-      confidence: 0.92 + Math.random() * 0.07,
+      type: detectedType,
+      rawImage: isDemo ? undefined : imageData,
+      extractedText,
+      extractedData,
+      confidence,
       scannedAt: new Date()
     };
 

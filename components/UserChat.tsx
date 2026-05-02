@@ -3,23 +3,23 @@ import { Cpu, Zap, BookOpen, Terminal, Activity, HelpCircle, ArrowDown, ArrowUp,
 import { Message, AgentStage, UserProfile, AgentType, ResponseStyle, AgentConfig, AGENTS_LIST, MOCK_LAWYERS, LawyerProfile, DocumentTemplate, ChatSession } from '../types';
 import { sendMessageToGemini } from '../services/geminiService';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { CreditModal } from './CreditModal';
+import { UpgradePopup } from './UpgradePopup';
 import { BookingModal } from './BookingModal';
 import { NewsSection } from './NewsSection';
 import { LegalToolsModal } from './LegalToolsModal';
 import { DraftDocumentModal } from './DraftDocumentModal';
 import { KnowledgeBaseModal } from './KnowledgeBaseModal';
 import { retrieveRelevantContext } from '../services/ragService';
+import { supabase } from '../services/supabase';
 
 interface UserChatProps {
   currentUser: UserProfile;
-  deductCredit: (amount?: number) => void;
   onCommand: (cmd: string) => void;
   agentConfigs: Record<AgentType, AgentConfig>;
   onTriggerUpgrade: (mode?: 'SUBSCRIPTION' | 'CREDITS') => void;
 }
 
-export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, onCommand, agentConfigs, onTriggerUpgrade }) => {
+export const UserChat: React.FC<UserChatProps> = ({ currentUser, onCommand, agentConfigs, onTriggerUpgrade }) => {
   // Session State
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -243,7 +243,8 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
   }, []);
 
   const processAIResponse = async (prompt: string, historyMessages: Message[], customCreditAmount: number = 1, _isSystemPrompt: boolean = false, extraMetadata?: any, targetSessionId?: string, attachmentData?: { mimeType: string, data: string }) => {
-    deductCredit(customCreditAmount);
+    // Credits are deducted server-side by the Tollgate middleware.
+    // No frontend deduction needed — realtime subscription keeps UI in sync.
     
     // Set processing session to current session or target
     const activeSessionForRequest = targetSessionId || currentSessionId;
@@ -261,8 +262,48 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
     const activeConfig = selectedAgent !== 'GENERAL' ? agentConfigs[selectedAgent] : undefined;
     
     try {
+      // Create initial empty bot message
+      const botMsgId = (Date.now() + 1).toString();
+      const initialBotMsg: Message = {
+        id: botMsgId,
+        role: 'model',
+        text: '',
+        timestamp: new Date(),
+        metadata: { 
+            agentUsed: selectedAgent, 
+            source: 'GENERAL_AI',
+            ...extraMetadata
+        }
+      };
+
+      setSessions(prev => prev.map(s => {
+          if (s.id === activeSessionForRequest) {
+              return { ...s, messages: [...s.messages, initialBotMsg], updatedAt: new Date() };
+          }
+          return s;
+      }));
+
       // If it's a system prompt (like drafting), we might want to override the persona in the prompt text itself or keep it general
-      const response = await sendMessageToGemini(prompt, apiHistory, selectedAgent, responseStyle, activeConfig, currentUser.level, attachmentData);
+      const response = await sendMessageToGemini(
+        prompt, 
+        apiHistory, 
+        selectedAgent, 
+        responseStyle, 
+        activeConfig, 
+        currentUser.level, 
+        attachmentData,
+        (token) => {
+          setSessions(prev => prev.map(s => {
+            if (s.id === activeSessionForRequest) {
+              return {
+                ...s,
+                messages: s.messages.map(m => m.id === botMsgId ? { ...m, text: m.text + token } : m)
+              };
+            }
+            return s;
+          }));
+        }
+      );
       
       let rawText = response.text;
       let requiresHuman = false;
@@ -285,6 +326,13 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
           // Remove markdown bolding
           text = text.replace(/\*\*/g, '');
           
+          // Remove prefixes like "Gợi ý 1: ", "[Gợi ý 1: "
+          text = text.replace(/^\[?Gợi ý \d+:\s*"?/i, '');
+          // Remove trailing quote and bracket
+          text = text.replace(/"?\]?$/i, '');
+          // Remove leftover quotes if any
+          text = text.replace(/^"/, '').replace(/"$/, '');
+          
           // Transform AI questions to User commands (Regex magic)
           // "Bạn có muốn tôi cung cấp X không?" -> "Tôi muốn cung cấp X"
           if (text.match(/^(Bạn|bạn) có (muốn|cần) (tôi|chúng tôi)?\s*/i)) {
@@ -301,27 +349,22 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, deductCredit, o
       const suggestions = parts[1] ? parts[1].split('\n').filter(l => l.trim().startsWith('-')).map(cleanSuggestion).slice(0, 4) : [];
 
       setAgentStage(AgentStage.REVIEWING);
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 400));
 
-      const botMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'model',
-        text: cleanText,
-        suggestedQuestions: suggestions,
-        suggestedLawyers: requiresHuman ? suggestedLawyers : undefined,
-        timestamp: new Date(),
-        metadata: { 
-            agentUsed: selectedAgent, 
-            source: response.source === 'BACKEND' ? 'SPECIALIZED_KB' : 'GENERAL_AI',
-            ...extraMetadata
-        }
-      };
-      
-      // Update session messages - need to find the session again in case it changed (though we are in a closure)
-      // Actually, we should update the session that initiated the request
+      // Final update to the message with suggestions and cleaned text
       setSessions(prev => prev.map(s => {
           if (s.id === activeSessionForRequest) {
-              return { ...s, messages: [...s.messages, botMsg], updatedAt: new Date() };
+              return {
+                  ...s,
+                  messages: s.messages.map(m => m.id === botMsgId ? {
+                      ...m,
+                      text: cleanText,
+                      suggestedQuestions: suggestions,
+                      suggestedLawyers: requiresHuman ? suggestedLawyers : undefined,
+                      metadata: { ...m.metadata, source: response.source === 'BACKEND' ? 'SPECIALIZED_KB' : 'GENERAL_AI' }
+                  } : m),
+                  updatedAt: new Date()
+              };
           }
           return s;
       }));
@@ -681,9 +724,18 @@ ${textToSend}
                    <button onClick={() => setResponseStyle('CONCISE')} className={`px-3 py-1 rounded-full text-xs ${responseStyle === 'CONCISE' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}>Ngắn gọn</button>
                    <button onClick={() => setResponseStyle('DEEP')} className={`px-3 py-1 rounded-full text-xs ${responseStyle === 'DEEP' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}>Chuyên sâu</button>
                 </div>
-                <div className="text-right">
-                    <div className="text-xs font-bold text-slate-300">{currentUser.name}</div>
-                    <div onClick={() => onTriggerUpgrade('CREDITS')} className="text-[10px] text-emerald-400 cursor-pointer hover:underline">{currentUser.credits} CR (Nạp thêm)</div>
+                <div className="text-right flex items-center gap-3">
+                    <div>
+                        <div className="text-xs font-bold text-slate-300">{currentUser.name}</div>
+                        <div onClick={() => onTriggerUpgrade('CREDITS')} className="text-[10px] text-emerald-400 cursor-pointer hover:underline">{currentUser.credits} CR (Nạp thêm)</div>
+                    </div>
+                    <button 
+                        onClick={() => supabase.auth.signOut()}
+                        className="p-1.5 hover:bg-red-500/10 text-slate-400 hover:text-red-400 rounded-md transition-colors"
+                        title="Đăng xuất"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    </button>
                 </div>
             </div>
         </header>
@@ -846,7 +898,7 @@ ${textToSend}
             userLevel={currentUser.level}
         />
         <LegalToolsModal isOpen={showToolsModal} onClose={() => setShowToolsModal(false)} />
-        <CreditModal isOpen={showCreditModal} onClose={() => setShowCreditModal(false)} onUpgrade={(mode) => { setShowCreditModal(false); onTriggerUpgrade(mode); }} />
+        {showCreditModal && <UpgradePopup onClose={() => setShowCreditModal(false)} userId={currentUser.id} />}
       </div>
     );
   }
@@ -1366,7 +1418,7 @@ ${textToSend}
           />
       )}
 
-      <CreditModal isOpen={showCreditModal} onClose={() => setShowCreditModal(false)} onUpgrade={(mode) => { setShowCreditModal(false); onTriggerUpgrade(mode); }} />
+      {showCreditModal && <UpgradePopup onClose={() => setShowCreditModal(false)} userId={currentUser.id} />}
       <LegalToolsModal 
           isOpen={showToolsModal} 
           onClose={() => setShowToolsModal(false)}

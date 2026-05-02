@@ -3,6 +3,7 @@ import { FileText, AlertTriangle, CheckCircle, Shield, ChevronRight, Send, Eye, 
 import { RiskHighlight, MOCK_CONTRACT_WITH_RISKS, MOCK_RISK_HIGHLIGHTS, Message } from '../../types';
 import { useLegalEngine } from '../../hooks/useLegalEngine';
 import * as mammoth from 'mammoth';
+import { retrieveRelevantContext, saveDocumentToKB } from '../../services/ragService';
 
 interface ContractAnalyzerProps {
   initialDocument?: { text: string; metadata: Record<string, string> };
@@ -25,7 +26,7 @@ function findTextMatch(fullText: string, searchSnippet: string): { start: number
   const map: number[] = [];
   let normalizedFull = '';
   for (let i = 0; i < fullText.length; i++) {
-    if (!/\\s/.test(fullText[i])) {
+    if (!/\s/.test(fullText[i])) {
       normalizedFull += fullText[i].toLowerCase();
       map.push(i);
     }
@@ -68,6 +69,7 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
   const riskRefs = useRef<Record<string, HTMLSpanElement | null>>({});
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const currentDocIdRef = useRef<string | null>(null);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -103,6 +105,12 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
       if (text && text.trim().length > 20) {
         setDocumentText(text);
         setInputMode('analyzing');
+        
+        // Save to KB in background (don't block UI)
+        saveDocumentToKB("Contract_Upload", text).then(id => {
+          currentDocIdRef.current = id;
+        }).catch(err => console.error("RAG Indexing Error:", err));
+
         setTimeout(() => runAnalysis(text), 100);
       } else {
         alert('Nội dung file quá ngắn hoặc không thể đọc được chữ (có thể là ảnh chụp hoặc PDF dạng ảnh). Vui lòng copy paste nội dung hoặc dùng chức năng Quét Ảnh.');
@@ -146,6 +154,9 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
   const startWithDemo = () => {
     setDocumentText(MOCK_CONTRACT_WITH_RISKS);
     setInputMode('analyzing');
+    saveDocumentToKB("Contract_Demo", MOCK_CONTRACT_WITH_RISKS).then(id => {
+      currentDocIdRef.current = id;
+    }).catch(err => console.error("RAG Indexing Error:", err));
     setTimeout(() => runAnalysis(MOCK_CONTRACT_WITH_RISKS), 100);
   };
 
@@ -154,6 +165,9 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
     if (pasteText.trim().length < 50) return;
     setDocumentText(pasteText);
     setInputMode('analyzing');
+    saveDocumentToKB("Contract_Paste", pasteText).then(id => {
+      currentDocIdRef.current = id;
+    }).catch(err => console.error("RAG Indexing Error:", err));
     setTimeout(() => runAnalysis(pasteText), 100);
   };
 
@@ -168,6 +182,7 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
     setActiveRiskId(null);
     setShowSuggestion(null);
     setApiError(false);
+    currentDocIdRef.current = null;
   };
 
   const runAnalysis = async (textOverride?: string) => {
@@ -275,19 +290,59 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
 
     try {
       const history = chatMessages.map(m => ({ role: m.role, text: m.text }));
+      
+      // RAG: Chỉ lấy context nếu hợp đồng dài
+      let contextText = documentText;
+      if (documentText.length > 3000) {
+        const relevantChunks = await retrieveRelevantContext(question, 5, currentDocIdRef.current || undefined);
+        if (relevantChunks.length > 0) {
+          contextText = relevantChunks.map(c => c.content).join('\n\n[...]\n\n');
+        } else {
+          contextText = documentText.slice(0, 3000);
+        }
+      }
+
       const resp = await fetch('/api/contract-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, contractText: documentText, chatHistory: history })
+        body: JSON.stringify({ question, contractText: contextText, chatHistory: history })
       });
-      const data = await resp.json();
-      const botMsg: Message = {
-        id: 'bot-' + Date.now(),
+
+      if (!resp.body) throw new Error('ReadableStream not supported.');
+
+      const botMsgId = 'bot-' + Date.now();
+      const initialBotMsg: Message = {
+        id: botMsgId,
         role: 'model',
-        text: data.answer || data.error || 'Không có phản hồi.',
+        text: '',
         timestamp: new Date()
       };
-      setChatMessages(prev => [...prev, botMsg]);
+      setChatMessages(prev => [...prev, initialBotMsg]);
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let done = false;
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          const chunkString = decoder.decode(value, { stream: true });
+          const lines = chunkString.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6).trim();
+              if (dataStr === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(dataStr);
+                if (parsed.text) {
+                  setChatMessages(prev => prev.map(m => m.id === botMsgId ? { ...m, text: m.text + parsed.text } : m));
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      }
     } catch {
       setChatMessages(prev => [...prev, {
         id: 'err-' + Date.now(),
@@ -445,13 +500,13 @@ export const ContractAnalyzer: React.FC<ContractAnalyzerProps> = ({ initialDocum
             <label
               className="group relative flex items-center gap-4 p-5 bg-slate-900/50 border border-slate-800 rounded-xl hover:border-blue-500/40 hover:bg-blue-500/5 transition-all text-left cursor-pointer overflow-hidden"
             >
-              <input type="file" accept=".txt,.doc,.docx,.pdf,.rtf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={handleFileUpload} onClick={(e) => { (e.target as HTMLInputElement).value = ''; }} />
+              <input type="file" accept=".txt,.doc,.docx" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={handleFileUpload} onClick={(e) => { (e.target as HTMLInputElement).value = ''; }} />
               <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center group-hover:bg-blue-500/20 transition-colors shrink-0 relative z-0">
                 <Upload size={22} className="text-blue-400" />
               </div>
               <div className="relative z-0">
                 <h3 className="font-bold text-white group-hover:text-blue-400 transition-colors">Upload file hợp đồng</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Hỗ trợ .txt, .doc, .docx (đọc dạng text)</p>
+                <p className="text-xs text-slate-500 mt-0.5">Hỗ trợ .txt, .docx (trích xuất nội dung văn bản)</p>
               </div>
               <ArrowRight size={18} className="text-slate-600 group-hover:text-blue-400 ml-auto transition-colors relative z-0" />
             </label>

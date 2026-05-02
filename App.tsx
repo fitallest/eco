@@ -41,23 +41,54 @@ const App: React.FC = () => {
   }, []);
 
   const fetchUserProfile = async (user: any) => {
-    const { data, error } = await supabase.from('users').select('*').eq('id', user.id).single();
-    if (data) {
-      setCurrentUser({
-        id: data.id,
-        name: user.user_metadata?.full_name || user.email || 'User',
-        email: data.email,
-        phone: data.phone || '',
-        level: data.role === 'ADMIN' ? 'Enterprise' : 'Free',
-        credits: data.credits,
-        status: 'Active',
-        totalSpent: 0,
-        joinedAt: data.created_at,
-        lastActive: new Date().toISOString()
-      });
-      setViewMode(data.role === 'ADMIN' ? 'ADMIN' : 'USER');
+    try {
+      const { data, error } = await supabase.from('users').select('*').eq('id', user.id).single();
+      
+      if (data) {
+        setCurrentUser({
+          id: data.id,
+          name: user.user_metadata?.full_name || user.email || 'User',
+          email: data.email,
+          phone: data.phone || '',
+          level: data.role === 'ADMIN' ? 'Enterprise' : 'Free',
+          credits: data.credits,
+          status: 'Active',
+          totalSpent: 0,
+          joinedAt: data.created_at,
+          lastActive: new Date().toISOString()
+        });
+        setViewMode(data.role === 'ADMIN' ? 'ADMIN' : 'USER');
+      } else {
+        // NEW USER: Auto-create record in 'users' table
+        const newUser = {
+          id: user.id,
+          email: user.email,
+          credits: 10, // Give 10 starter credits
+          role: 'USER'
+        };
+        
+        const { error: insertError } = await supabase.from('users').insert(newUser);
+        
+        if (!insertError) {
+          setCurrentUser({
+            id: user.id,
+            name: user.user_metadata?.full_name || user.email || 'User',
+            email: user.email,
+            phone: '',
+            level: 'Free',
+            credits: 10,
+            status: 'Active',
+            totalSpent: 0,
+            joinedAt: new Date().toISOString(),
+            lastActive: new Date().toISOString()
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching/creating user profile:', err);
+    } finally {
+      setIsAuthLoading(false);
     }
-    setIsAuthLoading(false);
   };
 
   // Realtime subscription — single source of truth for wallet balance

@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { checkAndDeductCredits } from "../lib/auth";
+import { checkAndDeductCredits } from "../lib/auth.js";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

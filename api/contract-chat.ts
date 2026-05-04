@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { createAIClient } from "../lib/ai-client";
+import { createAIClient } from "../lib/ai-client.js";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

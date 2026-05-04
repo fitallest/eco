@@ -1,4 +1,4 @@
-import { createAIClient } from "../lib/ai-client";
+import { createAIClient } from "../lib/ai-client.js";
 import OpenAI from "openai";
 
 export default async function handler(req: any, res: any) {

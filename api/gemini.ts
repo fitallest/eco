@@ -1,5 +1,5 @@
-import { checkAndDeductCredits } from "../lib/auth";
-import { createAIClient } from "../lib/ai-client";
+import { checkAndDeductCredits } from "../lib/auth.js";
+import { createAIClient } from "../lib/ai-client.js";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

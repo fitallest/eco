@@ -174,25 +174,27 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
         { role: 'user', parts: currentParts }
     ];
 
-    const responseStream = await ai.models.generateContentStream({
+    // Use non-streaming for Vercel serverless compatibility
+    const response = await ai.models.generateContent({
         model: modelName,
         contents: contents,
         config: {
             systemInstruction: fullSystemInstruction,
-            temperature: 0.3, 
-            tools: [{ googleSearch: {} }]
+            temperature: 0.3
         }
     });
 
+    const text = response.text || '';
+    
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders();
 
-    for await (const chunk of responseStream) {
-        if (chunk.text) {
-            res.write(`data: ${JSON.stringify({ text: chunk.text, source: 'GEMINI_DIRECT' })}\n\n`);
-        }
+    // Send response as SSE chunks for frontend compatibility
+    const chunkSize = 20;
+    for (let i = 0; i < text.length; i += chunkSize) {
+        const chunk = text.substring(i, i + chunkSize);
+        res.write(`data: ${JSON.stringify({ text: chunk, source: 'GEMINI_DIRECT' })}\n\n`);
     }
     res.write(`data: [DONE]\n\n`);
     res.end();

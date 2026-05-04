@@ -16,8 +16,8 @@ export const sendMessageToGemini = async (
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
 
-    // Primary engine: OpenAI (ChatGPT)
-    const response = await fetch('/api/openai', {
+    // Primary engine: Google Gemini (Vertex AI)
+    const response = await fetch('/api/gemini', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

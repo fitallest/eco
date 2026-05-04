@@ -24,13 +24,14 @@ export default async function handler(req: any, res: any) {
 
     const { prompt, history, agentType, responseStyle, agentConfig, userLevel, attachment } = req.body;
     
-    if (!process.env.GEMINI_API_KEY) throw new Error("Thieu GEMINI_API_KEY trong Environment Variables");
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const ai = new GoogleGenAI({ 
+        vertexai: { project: 'ecolaw-ai-qk-tl', location: 'us-central1' } 
+    });
     
-    // Select Model based on User Level
-    let modelName = 'gemini-flash-lite-latest'; 
+    // Select Model based on User Level (Vertex AI format)
+    let modelName = 'gemini-1.5-flash-002'; 
     if (userLevel === 'Enterprise' || userLevel === 'Gold') {
-        modelName = 'gemini-flash-latest'; 
+        modelName = 'gemini-1.5-pro-002'; 
     }
 
     const BASE_SYSTEM_INSTRUCTION = `
@@ -147,7 +148,7 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
         { role: 'user', parts: currentParts }
     ];
 
-    const response = await ai.models.generateContent({
+    const responseStream = await ai.models.generateContentStream({
         model: modelName,
         contents: contents,
         config: {
@@ -157,20 +158,33 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
         }
     });
 
-    res.status(200).json({ 
-        text: response.text || "Hệ thống không phản hồi.", 
-        source: 'GEMINI_DIRECT' 
-    });
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    for await (const chunk of responseStream) {
+        if (chunk.text) {
+            res.write(`data: ${JSON.stringify({ text: chunk.text, source: 'GEMINI_DIRECT' })}\n\n`);
+        }
+    }
+    res.write(`data: [DONE]\n\n`);
+    res.end();
 
   } catch (error: any) {
     console.error(`Gemini API Error:`, error);
     let errorMsg = "Đã xảy ra lỗi khi xử lý yêu cầu.";
-    if (error.message?.includes('API key not valid')) errorMsg = "Lỗi API Key.";
+    if (error.message?.includes('credentials')) errorMsg = "Lỗi xác thực Google Cloud (Credentials).";
     else if (error.message?.includes('429')) errorMsg = "Hệ thống đang bận (Rate Limit).";
     
-    res.status(500).json({ 
-        text: `⚠️ LỖI HỆ THỐNG\n\n${errorMsg}`, 
-        source: 'GEMINI_DIRECT' 
-    });
+    if (!res.headersSent) {
+      res.status(500).json({ 
+          text: `⚠️ LỖI HỆ THỐNG\n\n${errorMsg}`, 
+          source: 'GEMINI_DIRECT' 
+      });
+    } else {
+      res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ LỖI HỆ THỐNG\n\n${errorMsg}` })}\n\n`);
+      res.end();
+    }
   }
 }

@@ -1,12 +1,45 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import { handleTopup, handleAdminAdjust, handleGetBalance } from "./api/wallet";
 
 try { process.loadEnvFile(); } catch (e) {}
+
+// ── Load Google Cloud Credentials từ file JSON ──────────────────────
+function createVertexAI() {
+  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (credPath && fs.existsSync(credPath)) {
+    try {
+      const creds = JSON.parse(fs.readFileSync(credPath, 'utf-8'));
+      console.log(`[Vertex AI] ✅ Đã tìm thấy credentials: project=${creds.project_id}, email=${creds.client_email}`);
+      return new GoogleGenAI({
+        vertexai: true,
+        project: creds.project_id,
+        location: 'us-central1',
+        googleAuthOptions: {
+          credentials: {
+            client_email: creds.client_email,
+            private_key: creds.private_key,
+          }
+        }
+      });
+    } catch (e) {
+      console.error('[Vertex AI] ❌ Lỗi đọc credentials JSON:', e);
+    }
+  } else {
+    console.warn(`[Vertex AI] ⚠️ Không tìm thấy file credentials tại: ${credPath || '(chưa cấu hình)'}`);
+  }
+  // Fallback về AI Studio key nếu không có Vertex credentials
+  if (process.env.GEMINI_API_KEY) {
+    console.log('[Vertex AI] Fallback sang AI Studio API Key');
+    return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+  return null;
+}
 
 async function startServer() {
   const app = express();
@@ -88,13 +121,13 @@ async function startServer() {
 
       const { prompt, history, agentType, responseStyle, agentConfig, userLevel, attachment } = req.body;
       
-      if (!process.env.GEMINI_API_KEY) throw new Error("Thieu GEMINI_API_KEY trong Environment Variables");
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      // Select Model based on User Level
-      let modelName = 'gemini-flash-lite-latest'; 
+      const ai = createVertexAI();
+      if (!ai) throw new Error("Không tìm thấy Google Credentials. Kiểm tra file .env và đường dẫn GOOGLE_APPLICATION_CREDENTIALS.");
+
+      // Vertex AI model names
+      let modelName = 'gemini-2.5-flash';
       if (userLevel === 'Enterprise' || userLevel === 'Gold') {
-          modelName = 'gemini-flash-latest'; 
+          modelName = 'gemini-2.5-pro';
       }
 
       const BASE_SYSTEM_INSTRUCTION = `
@@ -216,8 +249,7 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
           contents: contents,
           config: {
               systemInstruction: fullSystemInstruction,
-              temperature: 0.3, 
-              tools: [{ googleSearch: {} }]
+              temperature: 0.3,
           }
       });
 
@@ -235,13 +267,14 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
       res.end();
 
     } catch (error: any) {
-      console.error(`Gemini API Error:`, error);
-      let errorMsg = `Lỗi thực tế: ${error.message} - ${error.stack}`;
-      
-      res.status(500).json({ 
-          text: `⚠️ LỖI HỆ THỐNG\n\n${errorMsg}`, 
-          source: 'GEMINI_DIRECT' 
-      });
+      console.error(`[/api/gemini] Error:`, error.message);
+      let errorMsg = error.message || 'Đã xảy ra lỗi không xác định.';
+      if (!res.headersSent) {
+        res.status(500).json({ text: `⚠️ LỖI HỆ THỐNG\n\n${errorMsg}`, source: 'GEMINI_DIRECT' });
+      } else {
+        res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ Lỗi: ${errorMsg}` })}\n\n`);
+        res.end();
+      }
     }
   });
 
@@ -429,11 +462,12 @@ TRẢ VỀ JSON THUẦN TÚY (không markdown, không backtick), theo format:
         }
       }
 
-      // Fallback to Gemini
-      if (!result && process.env.GEMINI_API_KEY) {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      // Fallback to Gemini (Vertex AI)
+      if (!result) {
+        const ai = createVertexAI();
+        if (!ai) throw new Error('Không có AI API key nào khả dụng.');
         const response = await ai.models.generateContent({
-          model: 'gemini-flash-latest',
+          model: 'gemini-2.5-flash',
           contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nPhân tích hợp đồng sau:\n\n${contractText}` }] }],
           config: { temperature: 0.1, responseMimeType: 'application/json' }
         });
@@ -531,15 +565,16 @@ ${contractText || 'Không có hợp đồng.'}`;
         }
       }
 
-      // Fallback to Gemini
-      if (process.env.GEMINI_API_KEY) {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      // Fallback to Gemini (Vertex AI)
+      {
+        const ai = createVertexAI();
+        if (!ai) throw new Error('Không có AI API key nào khả dụng.');
         const historyParts = (chatHistory || []).map((m: any) => ({
           role: m.role === 'model' ? 'model' : 'user',
           parts: [{ text: m.text || '' }]
         }));
         const responseStream = await ai.models.generateContentStream({
-          model: 'gemini-flash-latest',
+          model: 'gemini-2.5-flash',
           contents: [
             ...historyParts,
             { role: 'user', parts: [{ text: question }] }
@@ -630,12 +665,12 @@ FORMAT JSON BẮT BUỘC:
 
       let result: any = null;
 
-      // Try Gemini first (better at vision tasks)
-      if (process.env.GEMINI_API_KEY) {
-        try {
-          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      // Try Gemini first (better at vision tasks - uses Vertex AI)
+      try {
+        const ai = createVertexAI();
+        if (ai) {
           const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-2.5-flash',
             contents: [{
               role: 'user',
               parts: [
@@ -653,7 +688,6 @@ FORMAT JSON BẮT BUỘC:
               responseMimeType: 'application/json'
             }
           });
-
           const raw = response.text || '{}';
           try {
             result = JSON.parse(raw);
@@ -661,9 +695,9 @@ FORMAT JSON BẮT BUỘC:
             const jsonMatch = raw.match(/\{[\s\S]*\}/);
             if (jsonMatch) result = JSON.parse(jsonMatch[0]);
           }
-        } catch (geminiErr: any) {
-          console.error('Gemini OCR Error:', geminiErr.message);
         }
+      } catch (geminiErr: any) {
+        console.error('Gemini OCR Error:', geminiErr.message);
       }
 
       // Fallback to OpenAI GPT-4o Vision

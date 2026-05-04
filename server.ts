@@ -9,35 +9,54 @@ import { handleTopup, handleAdminAdjust, handleGetBalance } from "./api/wallet";
 
 try { process.loadEnvFile(); } catch (e) {}
 
-// ── Load Google Cloud Credentials từ file JSON ──────────────────────
+// ── Load Google Cloud Credentials ──────────────────────
 function createVertexAI() {
-  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (credPath && fs.existsSync(credPath)) {
+  let creds: any = null;
+
+  // Cách 1: Đọc từ biến môi trường GCP_SERVICE_ACCOUNT_JSON (Tốt nhất cho Vercel/Production)
+  if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
     try {
-      const creds = JSON.parse(fs.readFileSync(credPath, 'utf-8'));
-      console.log(`[Vertex AI] ✅ Đã tìm thấy credentials: project=${creds.project_id}, email=${creds.client_email}`);
-      return new GoogleGenAI({
-        vertexai: true,
-        project: creds.project_id,
-        location: 'us-central1',
-        googleAuthOptions: {
-          credentials: {
-            client_email: creds.client_email,
-            private_key: creds.private_key,
-          }
-        }
-      });
+      creds = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
+      console.log(`[Vertex AI] ✅ Đã load credentials từ Environment Variable (Project: ${creds.project_id})`);
     } catch (e) {
-      console.error('[Vertex AI] ❌ Lỗi đọc credentials JSON:', e);
+      console.error('[Vertex AI] ❌ Lỗi parse GCP_SERVICE_ACCOUNT_JSON từ biến môi trường:', e);
     }
-  } else {
-    console.warn(`[Vertex AI] ⚠️ Không tìm thấy file credentials tại: ${credPath || '(chưa cấu hình)'}`);
+  } 
+  
+  // Cách 2: Đọc từ file JSON (Tốt cho môi trường Local Development)
+  if (!creds) {
+    const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (credPath && fs.existsSync(credPath)) {
+      try {
+        creds = JSON.parse(fs.readFileSync(credPath, 'utf-8'));
+        console.log(`[Vertex AI] ✅ Đã load credentials từ file: ${credPath}`);
+      } catch (e) {
+        console.error('[Vertex AI] ❌ Lỗi đọc file credentials JSON:', e);
+      }
+    }
   }
+
+  if (creds) {
+    return new GoogleGenAI({
+      vertexai: true,
+      project: creds.project_id,
+      location: 'us-central1',
+      googleAuthOptions: {
+        credentials: {
+          client_email: creds.client_email,
+          private_key: creds.private_key,
+        }
+      }
+    });
+  }
+
   // Fallback về AI Studio key nếu không có Vertex credentials
   if (process.env.GEMINI_API_KEY) {
-    console.log('[Vertex AI] Fallback sang AI Studio API Key');
+    console.log('[Vertex AI] ⚠️ Fallback sang AI Studio API Key (Free Tier)');
     return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
+
+  console.warn('[Vertex AI] ❌ Không tìm thấy thông tin xác thực (JSON hoặc API Key)');
   return null;
 }
 

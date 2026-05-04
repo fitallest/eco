@@ -1,5 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
 import { checkAndDeductCredits } from "../lib/auth";
+import { createAIClient } from "../lib/ai-client";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -24,34 +24,9 @@ export default async function handler(req: any, res: any) {
 
     const { prompt, history, agentType, responseStyle, agentConfig, userLevel, attachment } = req.body;
     
-    let ai: any = null;
-    let creds: any = null;
-
-    if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
-        try {
-            creds = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
-            ai = new GoogleGenAI({
-                vertexai: true,
-                project: creds.project_id,
-                location: 'us-central1',
-                googleAuthOptions: {
-                    credentials: {
-                        client_email: creds.client_email,
-                        private_key: creds.private_key,
-                    }
-                }
-            });
-        } catch (e: any) {
-            console.error('[Vercel Gemini] Lỗi parse GCP_SERVICE_ACCOUNT_JSON:', e.message);
-        }
-    }
-
-    if (!ai && process.env.GEMINI_API_KEY) {
-        ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    }
-
+    const ai = createAIClient();
     if (!ai) {
-        throw new Error("Không tìm thấy cấu hình xác thực AI (GCP_SERVICE_ACCOUNT_JSON hoặc GEMINI_API_KEY).");
+        throw new Error("Không tìm thấy cấu hình xác thực AI.");
     }
     
     // Select Model based on User Level

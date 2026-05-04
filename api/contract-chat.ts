@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { GoogleGenAI } from "@google/genai";
+import { createAIClient } from "../lib/ai-client";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -68,42 +68,17 @@ ${contractText || 'Không có hợp đồng.'}`;
       }
     }
 
-    // Fallback to Gemini
+    // Fallback to Gemini (Vertex AI)
     if (!res.headersSent) {
       try {
-        let ai: any = null;
-        let creds: any = null;
-
-        if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
-            try {
-                creds = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
-                ai = new GoogleGenAI({
-                    vertexai: true,
-                    project: creds.project_id,
-                    location: 'us-central1',
-                    googleAuthOptions: {
-                        credentials: {
-                            client_email: creds.client_email,
-                            private_key: creds.private_key,
-                        }
-                    }
-                });
-            } catch (e: any) {
-                console.error('[Vercel Chat] Lỗi parse GCP_SERVICE_ACCOUNT_JSON:', e.message);
-            }
-        }
-
-        if (!ai && process.env.GEMINI_API_KEY) {
-            ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        }
-
+        const ai = createAIClient();
         if (ai) {
           const historyParts = (chatHistory || []).map((m: any) => ({
             role: m.role === 'model' ? 'model' : 'user',
             parts: [{ text: m.text || '' }]
           }));
           
-          const responseStream = await ai.models.generateContentStream({
+          const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: [
               ...historyParts,
@@ -112,17 +87,15 @@ ${contractText || 'Không có hợp đồng.'}`;
             config: { systemInstruction: systemPrompt, temperature: 0.2 }
           });
 
-          if (!res.headersSent) {
-            res.setHeader('Content-Type', 'text/event-stream');
-            res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('Connection', 'keep-alive');
-            res.flushHeaders();
-          }
+          const text = response.text || '';
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
 
-          for await (const chunk of responseStream) {
-            if (chunk.text) {
-              res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
-            }
+          const chunkSize = 20;
+          for (let i = 0; i < text.length; i += chunkSize) {
+            const chunk = text.substring(i, i + chunkSize);
+            res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
           }
           res.write(`data: [DONE]\n\n`);
           return res.end();

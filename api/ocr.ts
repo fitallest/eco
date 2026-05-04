@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { createAIClient } from "../lib/ai-client";
 import OpenAI from "openai";
 
 export default async function handler(req: any, res: any) {
@@ -41,32 +41,7 @@ FORMAT JSON BẮT BUỘC:
 
     // Try Gemini first (better at vision tasks)
     try {
-        let ai: any = null;
-        let creds: any = null;
-
-        if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
-            try {
-                creds = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
-                ai = new GoogleGenAI({
-                    vertexai: true,
-                    project: creds.project_id,
-                    location: 'us-central1',
-                    googleAuthOptions: {
-                        credentials: {
-                            client_email: creds.client_email,
-                            private_key: creds.private_key,
-                        }
-                    }
-                });
-            } catch (e: any) {
-                console.error('[Vercel OCR] Lỗi parse GCP_SERVICE_ACCOUNT_JSON:', e.message);
-            }
-        }
-
-        if (!ai && process.env.GEMINI_API_KEY) {
-            ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        }
-
+        const ai = createAIClient();
         if (ai) {
           const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -92,7 +67,6 @@ FORMAT JSON BẮT BUỘC:
           try {
             result = JSON.parse(raw);
           } catch {
-            // Try to extract JSON from response if wrapped in markdown
             const jsonMatch = raw.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
               result = JSON.parse(jsonMatch[0]);

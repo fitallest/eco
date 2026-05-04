@@ -69,37 +69,64 @@ ${contractText || 'Không có hợp đồng.'}`;
     }
 
     // Fallback to Gemini
-    if (process.env.GEMINI_API_KEY) {
+    if (!res.headersSent) {
       try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const historyParts = (chatHistory || []).map((m: any) => ({
-          role: m.role === 'model' ? 'model' : 'user',
-          parts: [{ text: m.text || '' }]
-        }));
-        
-        const responseStream = await ai.models.generateContentStream({
-          model: 'gemini-1.5-pro-latest',
-          contents: [
-            ...historyParts,
-            { role: 'user', parts: [{ text: question }] }
-          ],
-          config: { systemInstruction: systemPrompt, temperature: 0.2 }
-        });
+        let ai: any = null;
+        let creds: any = null;
 
-        if (!res.headersSent) {
-          res.setHeader('Content-Type', 'text/event-stream');
-          res.setHeader('Cache-Control', 'no-cache');
-          res.setHeader('Connection', 'keep-alive');
-          res.flushHeaders();
+        if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
+            try {
+                creds = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
+                ai = new GoogleGenAI({
+                    vertexai: true,
+                    project: creds.project_id,
+                    location: 'us-central1',
+                    googleAuthOptions: {
+                        credentials: {
+                            client_email: creds.client_email,
+                            private_key: creds.private_key,
+                        }
+                    }
+                });
+            } catch (e: any) {
+                console.error('[Vercel Chat] Lỗi parse GCP_SERVICE_ACCOUNT_JSON:', e.message);
+            }
         }
 
-        for await (const chunk of responseStream) {
-          if (chunk.text) {
-            res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+        if (!ai && process.env.GEMINI_API_KEY) {
+            ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        }
+
+        if (ai) {
+          const historyParts = (chatHistory || []).map((m: any) => ({
+            role: m.role === 'model' ? 'model' : 'user',
+            parts: [{ text: m.text || '' }]
+          }));
+          
+          const responseStream = await ai.models.generateContentStream({
+            model: 'gemini-2.5-flash',
+            contents: [
+              ...historyParts,
+              { role: 'user', parts: [{ text: question }] }
+            ],
+            config: { systemInstruction: systemPrompt, temperature: 0.2 }
+          });
+
+          if (!res.headersSent) {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders();
           }
+
+          for await (const chunk of responseStream) {
+            if (chunk.text) {
+              res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+            }
+          }
+          res.write(`data: [DONE]\n\n`);
+          return res.end();
         }
-        res.write(`data: [DONE]\n\n`);
-        return res.end();
       } catch (geminiErr: any) {
         console.error('Gemini contract-chat error:', geminiErr.message);
         if (res.headersSent) {

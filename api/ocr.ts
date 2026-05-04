@@ -40,43 +40,68 @@ FORMAT JSON BẮT BUỘC:
     let result: any = null;
 
     // Try Gemini first (better at vision tasks)
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.0-flash',
-          contents: [{
-            role: 'user',
-            parts: [
-              { text: ocrPrompt },
-              {
-                inlineData: {
-                  mimeType: mimeType || 'image/jpeg',
-                  data: imageBase64
-                }
-              }
-            ]
-          }],
-          config: {
-            temperature: 0.1,
-            responseMimeType: 'application/json'
-          }
-        });
+    try {
+        let ai: any = null;
+        let creds: any = null;
 
-        const raw = response.text || '{}';
-        try {
-          result = JSON.parse(raw);
-        } catch {
-          // Try to extract JSON from response if wrapped in markdown
-          const jsonMatch = raw.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            result = JSON.parse(jsonMatch[0]);
+        if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
+            try {
+                creds = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
+                ai = new GoogleGenAI({
+                    vertexai: true,
+                    project: creds.project_id,
+                    location: 'us-central1',
+                    googleAuthOptions: {
+                        credentials: {
+                            client_email: creds.client_email,
+                            private_key: creds.private_key,
+                        }
+                    }
+                });
+            } catch (e: any) {
+                console.error('[Vercel OCR] Lỗi parse GCP_SERVICE_ACCOUNT_JSON:', e.message);
+            }
+        }
+
+        if (!ai && process.env.GEMINI_API_KEY) {
+            ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        }
+
+        if (ai) {
+          const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [{
+              role: 'user',
+              parts: [
+                { text: ocrPrompt },
+                {
+                  inlineData: {
+                    mimeType: mimeType || 'image/jpeg',
+                    data: imageBase64
+                  }
+                }
+              ]
+            }],
+            config: {
+              temperature: 0.1,
+              responseMimeType: 'application/json'
+            }
+          });
+
+          const raw = response.text || '{}';
+          try {
+            result = JSON.parse(raw);
+          } catch {
+            // Try to extract JSON from response if wrapped in markdown
+            const jsonMatch = raw.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              result = JSON.parse(jsonMatch[0]);
+            }
           }
         }
       } catch (geminiErr: any) {
         console.error('Gemini OCR Error:', geminiErr.message);
       }
-    }
 
     // Fallback to OpenAI GPT-4o Vision
     if (!result && process.env.OPENAI_API_KEY) {

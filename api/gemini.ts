@@ -24,14 +24,40 @@ export default async function handler(req: any, res: any) {
 
     const { prompt, history, agentType, responseStyle, agentConfig, userLevel, attachment } = req.body;
     
-    const ai = new GoogleGenAI({ 
-        vertexai: { project: 'ecolaw-ai-qk-tl', location: 'us-central1' } 
-    });
+    let ai: any = null;
+    let creds: any = null;
+
+    if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
+        try {
+            creds = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
+            ai = new GoogleGenAI({
+                vertexai: true,
+                project: creds.project_id,
+                location: 'us-central1',
+                googleAuthOptions: {
+                    credentials: {
+                        client_email: creds.client_email,
+                        private_key: creds.private_key,
+                    }
+                }
+            });
+        } catch (e: any) {
+            console.error('[Vercel Gemini] Lỗi parse GCP_SERVICE_ACCOUNT_JSON:', e.message);
+        }
+    }
+
+    if (!ai && process.env.GEMINI_API_KEY) {
+        ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    }
+
+    if (!ai) {
+        throw new Error("Không tìm thấy cấu hình xác thực AI (GCP_SERVICE_ACCOUNT_JSON hoặc GEMINI_API_KEY).");
+    }
     
-    // Select Model based on User Level (Vertex AI format)
-    let modelName = 'gemini-1.5-flash-002'; 
+    // Select Model based on User Level
+    let modelName = 'gemini-2.5-flash'; 
     if (userLevel === 'Enterprise' || userLevel === 'Gold') {
-        modelName = 'gemini-1.5-pro-002'; 
+        modelName = 'gemini-2.5-pro'; 
     }
 
     const BASE_SYSTEM_INSTRUCTION = `

@@ -62,16 +62,43 @@ TRẢ VỀ JSON THUẦN TÚY (không markdown, không backtick), theo format:
     }
 
     // Fallback to Gemini
-    if (!result && process.env.GEMINI_API_KEY) {
+    if (!result) {
       try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const response = await ai.models.generateContent({
-          model: 'gemini-1.5-pro-latest',
-          contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nPhân tích hợp đồng sau:\n\n${contractText}` }] }],
-          config: { temperature: 0.1, responseMimeType: 'application/json' }
-        });
-        const raw = response.text || '{}';
-        result = JSON.parse(raw);
+        let ai: any = null;
+        let creds: any = null;
+
+        if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
+            try {
+                creds = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
+                ai = new GoogleGenAI({
+                    vertexai: true,
+                    project: creds.project_id,
+                    location: 'us-central1',
+                    googleAuthOptions: {
+                        credentials: {
+                            client_email: creds.client_email,
+                            private_key: creds.private_key,
+                        }
+                    }
+                });
+            } catch (e: any) {
+                console.error('[Vercel Analyze] Lỗi parse GCP_SERVICE_ACCOUNT_JSON:', e.message);
+            }
+        }
+
+        if (!ai && process.env.GEMINI_API_KEY) {
+            ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        }
+
+        if (ai) {
+          const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nPhân tích hợp đồng sau:\n\n${contractText}` }] }],
+            config: { temperature: 0.1, responseMimeType: 'application/json' }
+          });
+          const raw = response.text || '{}';
+          result = JSON.parse(raw);
+        }
       } catch (geminiErr: any) {
         console.error('Gemini contract-analyze error:', geminiErr.message);
       }

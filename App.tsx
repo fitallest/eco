@@ -267,6 +267,7 @@ const App: React.FC = () => {
         onSuccess={handlePaymentSuccess}
         currentLevel={currentUser.level}
         initialMode={paymentInitialMode}
+        currentUser={currentUser}
       />
     </>
   );

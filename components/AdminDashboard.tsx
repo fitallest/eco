@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { UserProfile, AgentConfig, AgentType, AGENTS_LIST, PlanConfig, UserLevel, Transaction, MOCK_TRANSACTIONS } from '../types';
+import { UserProfile, AgentConfig, AgentType, AGENTS_LIST, PlanConfig, UserLevel, Transaction, MOCK_TRANSACTIONS, UpgradeRequest, CREDIT_PACKS } from '../types';
+import { supabase } from '../services/supabase';
 import { AgentSettingsModal } from './AgentSettingsModal';
 import { PlanSettingsModal } from './PlanSettingsModal';
 import { Users, Activity, BarChart3, Bot, Search, Edit2, Trash2, Zap, DollarSign, Lock, Unlock, X, PlusCircle, CreditCard, Check, Wifi, Globe, Server, Radio, Cpu, Calendar, Save, Receipt, Eye, Clock, CheckCircle2, User } from 'lucide-react';
@@ -63,8 +64,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Edit User State
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
 
-  // Transaction Modal State
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  // Upgrade Requests State
+  const [upgradeRequests, setUpgradeRequests] = useState<UpgradeRequest[]>([]);
+  const [selectedRequest, setSelectedRequest] = useState<UpgradeRequest | null>(null);
+  const [requestLoading, setRequestLoading] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -109,6 +112,87 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchRequests = async () => {
+    if (!currentSession?.access_token) return;
+    try {
+      const { data, error } = await supabase
+        .from('upgrade_requests')
+        .select(`
+          *,
+          users (
+            email,
+            phone
+          )
+        `)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      setUpgradeRequests(data as any);
+    } catch (err: any) {
+      console.error('Lỗi khi fetch upgrade requests:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'TRANSACTIONS') {
+        fetchRequests();
+    }
+  }, [activeTab]);
+
+  const handleApproveRequest = async (req: UpgradeRequest) => {
+      setRequestLoading(req.id);
+      try {
+          // 1. Determine what they bought
+          const pack = CREDIT_PACKS.find(p => p.name === req.package_name);
+          
+          if (pack) {
+              // It's a credit pack -> Add credits via wallet API
+              const res = await fetch('/api/wallet/admin-adjust', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${currentSession.access_token}`
+                  },
+                  body: JSON.stringify({ targetUserId: req.user_id, amount: pack.credits, note: `Phê duyệt mua gói ${pack.name}` })
+              });
+              const data = await res.json();
+              if (!data.success) throw new Error(data.error);
+          } else if (req.package_name.includes('Enterprise') || req.package_name.includes('Gold')) {
+              // It's a subscription -> Update role/level directly using Supabase
+              const role = req.package_name.includes('Enterprise') ? 'ADMIN' : 'USER'; // Gold is still USER but with level Gold (which we might handle differently, but here we just set role)
+              const { error } = await supabase.from('users').update({ role }).eq('id', req.user_id);
+              if (error) throw error;
+          }
+
+          // 2. Update status to APPROVED
+          const { error: updateErr } = await supabase.from('upgrade_requests').update({ status: 'APPROVED' }).eq('id', req.id);
+          if (updateErr) throw updateErr;
+
+          showToast(`✅ Đã duyệt yêu cầu gói ${req.package_name}`);
+          setSelectedRequest(null);
+          fetchRequests();
+      } catch (err: any) {
+          showToast(`❌ Lỗi duyệt yêu cầu: ${err.message}`, 'error');
+      } finally {
+          setRequestLoading(null);
+      }
+  };
+
+  const handleRejectRequest = async (req: UpgradeRequest) => {
+      setRequestLoading(req.id);
+      try {
+          const { error } = await supabase.from('upgrade_requests').update({ status: 'REJECTED' }).eq('id', req.id);
+          if (error) throw error;
+          showToast(`Đã từ chối yêu cầu`);
+          setSelectedRequest(null);
+          fetchRequests();
+      } catch (err: any) {
+          showToast(`❌ Lỗi: ${err.message}`, 'error');
+      } finally {
+          setRequestLoading(null);
+      }
+  };
 
   const handleStatusToggle = (user: UserProfile) => {
     const newStatus = user.status === 'Active' ? 'Locked' : 'Active';
@@ -191,7 +275,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <nav className="space-y-2">
             <button onClick={() => setActiveTab('OVERVIEW')} className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 ${activeTab === 'OVERVIEW' ? 'bg-emerald-600/10 text-emerald-400' : 'text-slate-500 hover:text-white'}`}><BarChart3 size={18}/> Tổng quan</button>
             <button onClick={() => setActiveTab('USERS')} className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 ${activeTab === 'USERS' ? 'bg-emerald-600/10 text-emerald-400' : 'text-slate-500 hover:text-white'}`}><Users size={18}/> Người dùng</button>
-            <button onClick={() => setActiveTab('TRANSACTIONS')} className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 ${activeTab === 'TRANSACTIONS' ? 'bg-emerald-600/10 text-emerald-400' : 'text-slate-500 hover:text-white'}`}><Receipt size={18}/> Giao dịch</button>
+            <button onClick={() => setActiveTab('TRANSACTIONS')} className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 ${activeTab === 'TRANSACTIONS' ? 'bg-emerald-600/10 text-emerald-400' : 'text-slate-500 hover:text-white'}`}><Receipt size={18}/> Duyệt Đăng Ký</button>
             <button onClick={() => setActiveTab('PLANS')} className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 ${activeTab === 'PLANS' ? 'bg-emerald-600/10 text-emerald-400' : 'text-slate-500 hover:text-white'}`}><CreditCard size={18}/> Gói dịch vụ</button>
             <button onClick={() => setActiveTab('AGENTS')} className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 ${activeTab === 'AGENTS' ? 'bg-emerald-600/10 text-emerald-400' : 'text-slate-500 hover:text-white'}`}><Bot size={18}/> Agents AI</button>
         </nav>
@@ -204,7 +288,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <h1 className="text-2xl font-bold text-white">
                 {activeTab === 'OVERVIEW' ? 'Trung tâm điều khiển' : 
                  activeTab === 'USERS' ? 'Quản lý Người dùng' : 
-                 activeTab === 'TRANSACTIONS' ? 'Lịch sử Giao dịch' : 
+                 activeTab === 'TRANSACTIONS' ? 'Yêu cầu Đăng ký Dịch vụ' : 
                  activeTab === 'PLANS' ? 'Cấu hình Gói dịch vụ' : 'Mạng lưới Agent'}
             </h1>
             <div className="flex items-center gap-2 text-slate-500 text-sm">
@@ -408,36 +492,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
         )}
 
-        {/* Transaction History Table */}
+        {/* Upgrade Requests Table */}
         {activeTab === 'TRANSACTIONS' && (
              <div className="space-y-4">
                 <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-slate-950 text-slate-400 uppercase font-bold text-xs">
                             <tr>
-                                <th className="px-6 py-4">ID Giao dịch</th>
+                                <th className="px-6 py-4">ID Yêu cầu</th>
                                 <th className="px-6 py-4">Khách hàng</th>
-                                <th className="px-6 py-4">Gói / Dịch vụ</th>
-                                <th className="px-6 py-4">Số tiền</th>
-                                <th className="px-6 py-4">Trạng thái</th>
+                                <th className="px-6 py-4">SĐT Liên hệ</th>
+                                <th className="px-6 py-4">Gói Đăng ký</th>
                                 <th className="px-6 py-4">Thời gian</th>
+                                <th className="px-6 py-4">Trạng thái</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
-                            {MOCK_TRANSACTIONS.map(txn => (
-                                <tr key={txn.id} className="hover:bg-slate-800/30 cursor-pointer" onClick={() => setSelectedTransaction(txn)}>
-                                    <td className="px-6 py-4 text-slate-400 font-mono text-xs">{txn.id}</td>
-                                    <td className="px-6 py-4 text-white font-medium">{txn.userId}</td>
-                                    <td className="px-6 py-4 text-slate-300">{txn.description}</td>
-                                    <td className="px-6 py-4 font-mono font-bold text-white">{txn.amount.toLocaleString('vi-VN')}₫</td>
+                            {upgradeRequests.length > 0 ? upgradeRequests.map(req => (
+                                <tr key={req.id} className="hover:bg-slate-800/30 cursor-pointer" onClick={() => setSelectedRequest(req)}>
+                                    <td className="px-6 py-4 text-slate-400 font-mono text-xs">{req.id.split('-')[0]}...</td>
+                                    <td className="px-6 py-4 text-white font-medium">{req.users?.email || req.user_id.split('-')[0]}</td>
+                                    <td className="px-6 py-4 text-slate-300 font-mono">{req.users?.phone || 'N/A'}</td>
+                                    <td className="px-6 py-4 font-bold text-emerald-400">{req.package_name}</td>
+                                    <td className="px-6 py-4 text-slate-500 text-xs">{new Date(req.created_at).toLocaleString('vi-VN')}</td>
                                     <td className="px-6 py-4">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getTxnStatusColor(txn.status)}`}>
-                                            {txn.status}
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getTxnStatusColor(req.status)}`}>
+                                            {req.status}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-slate-500 text-xs">{txn.timestamp.toLocaleDateString('vi-VN')}</td>
                                 </tr>
-                            ))}
+                            )) : (
+                                <tr>
+                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                                        Không có yêu cầu đăng ký nào.
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
@@ -591,73 +681,78 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* Transaction Detail Modal */}
-      {selectedTransaction && (
+      {/* Request Detail Modal */}
+      {selectedRequest && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
               <div className="bg-slate-900 w-full max-w-lg rounded-2xl border border-slate-700 shadow-2xl overflow-hidden">
                   <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                       <div>
-                          <h3 className="font-bold text-white text-lg flex items-center gap-2"><Receipt size={20} className="text-emerald-500"/> Chi tiết Giao dịch</h3>
-                          <span className="text-xs text-slate-500 font-mono">{selectedTransaction.id}</span>
+                          <h3 className="font-bold text-white text-lg flex items-center gap-2"><Receipt size={20} className="text-emerald-500"/> Chi tiết Yêu cầu</h3>
+                          <span className="text-xs text-slate-500 font-mono">{selectedRequest.id}</span>
                       </div>
-                      <button onClick={() => setSelectedTransaction(null)}><X className="text-slate-500 hover:text-white" size={20}/></button>
+                      <button onClick={() => setSelectedRequest(null)}><X className="text-slate-500 hover:text-white" size={20}/></button>
                   </div>
                   <div className="p-6 space-y-6">
                       {/* Amount & Status Hero */}
                       <div className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-slate-800">
                            <div>
-                               <div className="text-xs text-slate-500 font-bold uppercase mb-1">Số tiền thanh toán</div>
-                               <div className="text-2xl font-bold text-white font-mono">{selectedTransaction.amount.toLocaleString('vi-VN')} ₫</div>
+                               <div className="text-xs text-slate-500 font-bold uppercase mb-1">Gói Đăng ký</div>
+                               <div className="text-xl font-bold text-emerald-400">{selectedRequest.package_name}</div>
                            </div>
-                           <div className={`px-3 py-1.5 rounded-lg border text-xs font-bold uppercase flex items-center gap-2 ${getTxnStatusColor(selectedTransaction.status)}`}>
-                               {selectedTransaction.status === 'SUCCESS' ? <CheckCircle2 size={14} className="fill-current"/> : selectedTransaction.status === 'PENDING' ? <Clock size={14}/> : <X size={14}/>}
-                               {selectedTransaction.status}
+                           <div className={`px-3 py-1.5 rounded-lg border text-xs font-bold uppercase flex items-center gap-2 ${getTxnStatusColor(selectedRequest.status)}`}>
+                               {selectedRequest.status === 'APPROVED' ? <CheckCircle2 size={14} className="fill-current"/> : selectedRequest.status === 'PENDING' ? <Clock size={14}/> : <X size={14}/>}
+                               {selectedRequest.status}
                            </div>
                       </div>
 
                       {/* Details Grid */}
                       <div className="grid grid-cols-2 gap-6">
-                           <div>
-                               <div className="text-xs text-slate-500 font-bold uppercase mb-1">Gói dịch vụ (Plan)</div>
-                               <div className="text-white font-medium flex items-center gap-2">
-                                   <CreditCard size={14} className="text-slate-400"/> {selectedTransaction.planId}
-                               </div>
-                           </div>
-                           <div>
-                               <div className="text-xs text-slate-500 font-bold uppercase mb-1">Phương thức</div>
-                               <div className="text-white font-medium flex items-center gap-2">
-                                   <Globe size={14} className="text-slate-400"/> {selectedTransaction.method}
-                               </div>
-                           </div>
-                           <div>
+                           <div className="col-span-2">
                                <div className="text-xs text-slate-500 font-bold uppercase mb-1">Khách hàng</div>
                                <div className="text-white font-medium flex items-center gap-2">
-                                   <User size={14} className="text-slate-400"/> {selectedTransaction.userId}
+                                   <User size={14} className="text-slate-400"/> {selectedRequest.users?.email || selectedRequest.user_id}
                                </div>
                            </div>
                            <div>
-                               <div className="text-xs text-slate-500 font-bold uppercase mb-1">Thời gian</div>
-                               <div className="text-white font-medium flex items-center gap-2">
-                                   <Calendar size={14} className="text-slate-400"/> {selectedTransaction.timestamp.toLocaleString('vi-VN')}
+                               <div className="text-xs text-slate-500 font-bold uppercase mb-1">Số điện thoại</div>
+                               <div className="text-white font-mono font-medium flex items-center gap-2">
+                                   <Globe size={14} className="text-slate-400"/> {selectedRequest.users?.phone || 'N/A'}
                                </div>
                            </div>
-                      </div>
-
-                      {/* Description */}
-                      <div className="bg-slate-800/20 p-4 rounded-xl border border-slate-800">
-                          <div className="text-xs text-slate-500 font-bold uppercase mb-2">Nội dung giao dịch</div>
-                          <p className="text-sm text-slate-300">{selectedTransaction.description}</p>
+                           <div>
+                               <div className="text-xs text-slate-500 font-bold uppercase mb-1">Thời gian gửi</div>
+                               <div className="text-white font-medium flex items-center gap-2">
+                                   <Calendar size={14} className="text-slate-400"/> {new Date(selectedRequest.created_at).toLocaleString('vi-VN')}
+                               </div>
+                           </div>
                       </div>
                   </div>
                   
                   {/* Footer Actions */}
                   <div className="p-6 border-t border-slate-800 flex justify-end gap-3 bg-slate-950/50">
-                      <button className="px-4 py-2 rounded-lg text-slate-400 hover:text-white font-medium text-sm flex items-center gap-2 bg-slate-900 border border-slate-700">
-                          <Eye size={14}/> Xem Invoice
-                      </button>
-                      <button onClick={() => setSelectedTransaction(null)} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/20">
-                          Đóng
-                      </button>
+                      {selectedRequest.status === 'PENDING' && (
+                          <>
+                              <button 
+                                onClick={() => handleRejectRequest(selectedRequest)} 
+                                disabled={requestLoading === selectedRequest.id}
+                                className="px-4 py-2 rounded-lg text-red-400 hover:text-white hover:bg-red-900/50 font-medium text-sm flex items-center gap-2 border border-red-900/50 disabled:opacity-50 transition-colors"
+                              >
+                                  Từ chối
+                              </button>
+                              <button 
+                                onClick={() => handleApproveRequest(selectedRequest)} 
+                                disabled={requestLoading === selectedRequest.id}
+                                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/20 disabled:opacity-50 transition-colors"
+                              >
+                                  Duyệt Yêu Cầu
+                              </button>
+                          </>
+                      )}
+                      {selectedRequest.status !== 'PENDING' && (
+                          <button onClick={() => setSelectedRequest(null)} className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm">
+                              Đóng
+                          </button>
+                      )}
                   </div>
               </div>
           </div>

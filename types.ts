@@ -68,6 +68,20 @@ export interface Transaction {
   method: 'CREDIT_CARD' | 'PAYPAL' | 'BANK_TRANSFER';
 }
 
+export interface UpgradeRequest {
+  id: string;
+  user_id: string;
+  package_name: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  created_at: string;
+  // Bổ sung thông tin join từ bảng users
+  users?: {
+    email: string;
+    name: string;
+    phone: string;
+  };
+}
+
 export enum ModelNames {
   FLASH = 'gemini-3-flash-preview',
   PRO = 'gemini-3-pro-preview',

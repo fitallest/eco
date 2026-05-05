@@ -45,7 +45,7 @@ const App: React.FC = () => {
       const { data, error } = await supabase.from('users').select('*').eq('id', user.id).single();
       
       if (data) {
-        const isAdmin = data.role === 'ADMIN' || data.email === 'caophi.nasani@gmail.com';
+        const isAdmin = data.role === 'ADMIN' || data.email?.toLowerCase() === 'caophi.nasani@gmail.com';
         setCurrentUser({
           id: data.id,
           name: user.user_metadata?.full_name || user.email || 'User',
@@ -107,7 +107,7 @@ const App: React.FC = () => {
           ...prev,
           credits: payload.new.credits,
           phone: payload.new.phone || prev.phone,
-          level: (payload.new.role === 'ADMIN' || prev.email === 'caophi.nasani@gmail.com') ? 'Enterprise' : 'Free'
+          level: (payload.new.role === 'ADMIN' || prev.email?.toLowerCase() === 'caophi.nasani@gmail.com') ? 'Enterprise' : 'Free'
         }));
       })
       .subscribe();
@@ -128,10 +128,10 @@ const App: React.FC = () => {
   const handleCommand = useCallback((cmd: string) => {
     const trimmedCmd = cmd.trim().toLowerCase();
     if (trimmedCmd === '/admin') {
-      if (currentUser?.email === 'caophi.nasani@gmail.com') {
+      if (currentUser?.email?.toLowerCase() === 'caophi.nasani@gmail.com' || currentUser?.level === 'Enterprise') {
         setViewMode('ADMIN');
       } else {
-        alert('Bạn không có quyền truy cập vào phần quản trị.');
+        alert(`Bạn không có quyền truy cập vào phần quản trị. (Email hiện tại: ${currentUser?.email})`);
       }
     }
     else if (trimmedCmd === '/user') setViewMode('USER');

@@ -114,3 +114,16 @@ export async function handleGetBalance(req: any, res: any) {
         return res.status(500).json({ error: err.message });
     }
 }
+
+export default async function handler(req: any, res: any) {
+    if (req.url.includes('/balance') && req.method === 'GET') {
+        return handleGetBalance(req, res);
+    }
+    if (req.url.includes('/topup') && req.method === 'POST') {
+        return handleTopup(req, res);
+    }
+    if (req.url.includes('/admin-adjust') && req.method === 'POST') {
+        return handleAdminAdjust(req, res);
+    }
+    return res.status(404).json({ error: 'Not found' });
+}

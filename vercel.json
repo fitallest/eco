@@ -16,6 +16,8 @@
     }
   ],
   "rewrites": [
+    { "source": "/api/admin/:path*", "destination": "/api/admin" },
+    { "source": "/api/wallet/:path*", "destination": "/api/wallet" },
     { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

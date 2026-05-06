@@ -112,3 +112,16 @@ export async function handleUpdateUser(req: any, res: any) {
          res.status(500).json({ error: err.message });
     }
 }
+
+export default async function handler(req: any, res: any) {
+    if (req.method === 'GET' && req.url.includes('/users')) {
+        return handleGetUsers(req, res);
+    }
+    if (req.method === 'PUT' && req.url.includes('/users/')) {
+        const parts = req.url.split('?')[0].split('/');
+        const id = parts[parts.length - 1];
+        req.params = { ...req.params, id };
+        return handleUpdateUser(req, res);
+    }
+    return res.status(404).json({ error: 'Not found' });
+}

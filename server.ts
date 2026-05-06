@@ -6,6 +6,7 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import { handleTopup, handleAdminAdjust, handleGetBalance } from "./api/wallet";
+import { handleGetUsers, handleUpdateUser } from "./api/admin";
 
 try { process.loadEnvFile(); } catch (e) {}
 
@@ -772,6 +773,10 @@ FORMAT JSON BẮT BUỘC:
   app.get("/api/wallet/balance", handleGetBalance);
   app.post("/api/wallet/topup", handleTopup);
   app.post("/api/wallet/admin-adjust", handleAdminAdjust);
+
+  // ── Admin API routes ────────────────────────────────────────────
+  app.get("/api/admin/users", handleGetUsers);
+  app.put("/api/admin/users/:id", handleUpdateUser);
 
   if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const vite = await createViteServer({

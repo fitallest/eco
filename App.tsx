@@ -12,8 +12,22 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('USER');
   const [users, setUsers] = useState<UserProfile[]>(INITIAL_USERS);
   const [currentUser, setCurrentUser] = useState<UserProfile>(INITIAL_USERS[1]);
-  const [agentConfigs, setAgentConfigs] = useState<Record<AgentType, AgentConfig>>(INITIAL_AGENT_CONFIGS);
-  const [planConfigs, setPlanConfigs] = useState<Record<UserLevel, PlanConfig>>(INITIAL_PLAN_CONFIGS);
+  const [agentConfigs, setAgentConfigs] = useState<Record<AgentType, AgentConfig>>(() => {
+    const saved = localStorage.getItem('ECOLAW_AGENT_CONFIGS');
+    return saved ? JSON.parse(saved) : INITIAL_AGENT_CONFIGS;
+  });
+  const [planConfigs, setPlanConfigs] = useState<Record<UserLevel, PlanConfig>>(() => {
+    const saved = localStorage.getItem('ECOLAW_PLAN_CONFIGS');
+    return saved ? JSON.parse(saved) : INITIAL_PLAN_CONFIGS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('ECOLAW_AGENT_CONFIGS', JSON.stringify(agentConfigs));
+  }, [agentConfigs]);
+
+  useEffect(() => {
+    localStorage.setItem('ECOLAW_PLAN_CONFIGS', JSON.stringify(planConfigs));
+  }, [planConfigs]);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentInitialMode, setPaymentInitialMode] = useState<'SUBSCRIPTION' | 'CREDITS'>('SUBSCRIPTION');

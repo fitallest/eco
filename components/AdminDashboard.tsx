@@ -19,13 +19,15 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  users, onCommand, onDeleteUser, onUpdateUser, onAddUser, agentConfigs, onUpdateAgentConfigs, planConfigs, onUpdatePlanConfigs, currentSession
+  users: initialUsers, onCommand, onDeleteUser, onUpdateUser, onAddUser, agentConfigs, onUpdateAgentConfigs, planConfigs, onUpdatePlanConfigs, currentSession
 }) => {
   const [activeTab, setActiveTab] = useState('OVERVIEW');
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [creditAdjustLoading, setCreditAdjustLoading] = useState<string | null>(null);
+  const [adminUsers, setAdminUsers] = useState<UserProfile[]>(initialUsers);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -49,7 +51,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
       const data = await res.json();
       if (data.success) {
-        onUpdateUser({ ...targetUser, credits: data.credits });
+        setAdminUsers(prev => prev.map(u => u.id === targetUser.id ? { ...u, credits: data.credits } : u));
+        onUpdateUser({ ...targetUser, credits: data.credits }); // Keep app state synced
         showToast(`✅ Đã ${amount > 0 ? 'cộng' : 'trừ'} ${Math.abs(amount)} điểm cho ${targetUser.name}. Số dư mới: ${data.credits} CR`);
       } else {
         showToast(`❌ Lỗi: ${data.error}`, 'error');
@@ -60,6 +63,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setCreditAdjustLoading(null);
     }
   };
+
+  const fetchUsers = async () => {
+      if (!currentSession?.access_token) return;
+      setIsLoadingUsers(true);
+      try {
+          const res = await fetch('/api/admin/users', {
+              headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
+          });
+          const data = await res.json();
+          if (data.users) {
+              setAdminUsers(data.users);
+          } else if (data.error) {
+              showToast(`❌ Lỗi tải người dùng: ${data.error}`, 'error');
+          }
+      } catch (err: any) {
+          showToast(`❌ Lỗi kết nối: ${err.message}`, 'error');
+      } finally {
+          setIsLoadingUsers(false);
+      }
+  };
+
+  useEffect(() => {
+      if (activeTab === 'USERS' || activeTab === 'OVERVIEW') {
+          fetchUsers();
+      }
+  }, [activeTab]);
 
   // Edit User State
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -194,9 +223,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
   };
 
-  const handleStatusToggle = (user: UserProfile) => {
+  const handleStatusToggle = async (user: UserProfile) => {
     const newStatus = user.status === 'Active' ? 'Locked' : 'Active';
-    onUpdateUser({ ...user, status: newStatus });
+    try {
+        const res = await fetch(`/api/admin/users/${user.id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentSession.access_token}`
+            },
+            body: JSON.stringify({ status: newStatus })
+        });
+        const data = await res.json();
+        if (data.success) {
+            setAdminUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
+            onUpdateUser({ ...user, status: newStatus });
+            showToast(`✅ Đã ${newStatus === 'Locked' ? 'khóa' : 'mở khóa'} tài khoản ${user.email}`);
+        } else {
+            showToast(`❌ Lỗi: ${data.error}`, 'error');
+        }
+    } catch (err: any) {
+        showToast(`❌ Lỗi kết nối: ${err.message}`, 'error');
+    }
   };
 
   const handleCreateUser = () => {
@@ -228,14 +276,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
   };
 
-  const handleSaveUser = () => {
-      if (editingUser) {
-          onUpdateUser(editingUser);
-          setEditingUser(null);
+  const handleSaveUser = async () => {
+      if (!editingUser || !currentSession?.access_token) return;
+      try {
+          const res = await fetch(`/api/admin/users/${editingUser.id}`, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${currentSession.access_token}`
+              },
+              body: JSON.stringify({ 
+                  level: editingUser.level, 
+                  credits: editingUser.credits,
+                  status: editingUser.status,
+                  phone: editingUser.phone
+              })
+          });
+          const data = await res.json();
+          if (data.success) {
+              setAdminUsers(prev => prev.map(u => u.id === editingUser.id ? editingUser : u));
+              onUpdateUser(editingUser);
+              setEditingUser(null);
+              showToast(`✅ Đã cập nhật thành công ${editingUser.email}`);
+          } else {
+              showToast(`❌ Lỗi: ${data.error}`, 'error');
+          }
+      } catch (err: any) {
+          showToast(`❌ Lỗi kết nối: ${err.message}`, 'error');
       }
   };
 
-  const filteredUsers = users.filter(user => 
+  const filteredUsers = adminUsers.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -380,7 +451,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                         <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
                             <div className="text-slate-400 text-xs font-bold uppercase mb-2 flex items-center gap-2"><Users size={14}/> Total Users</div>
-                            <div className="text-3xl font-bold text-white">{users.length}</div>
+                            <div className="text-3xl font-bold text-white">{adminUsers.length}</div>
                         </div>
                         <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
                             <div className="text-slate-400 text-xs font-bold uppercase mb-2 flex items-center gap-2"><Activity size={14}/> Daily Requests</div>
@@ -474,7 +545,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                                     title="Trừ 10 điểm"
                                                 >-10</button>
                                                 <button onClick={() => setEditingUser(u)} className="text-slate-400 hover:text-emerald-400 p-1 hover:bg-slate-800 rounded transition-colors ml-1"><Edit2 size={14}/></button>
-                                                <button onClick={() => onDeleteUser(u.id)} className="text-slate-400 hover:text-red-500 p-1 hover:bg-slate-800 rounded transition-colors"><Trash2 size={14}/></button>
                                             </div>
                                         </td>
                                     </tr>

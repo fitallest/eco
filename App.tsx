@@ -9,7 +9,12 @@ import { supabase } from './services/supabase';
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 
 const App: React.FC = () => {
-  const [viewMode, setViewMode] = useState<ViewMode>('USER');
+  // Persist viewMode in localStorage so tab-switching / token refresh can't reset it
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem('ECOLAW_VIEW_MODE');
+    return (saved === 'ADMIN' || saved === 'USER') ? saved as ViewMode : 'USER';
+  });
+  const lastFetchedUserId = React.useRef<string | null>(null);
   const [users, setUsers] = useState<UserProfile[]>(INITIAL_USERS);
   const [currentUser, setCurrentUser] = useState<UserProfile>(INITIAL_USERS[1]);
   const [agentConfigs, setAgentConfigs] = useState<Record<AgentType, AgentConfig>>(() => {
@@ -29,6 +34,10 @@ const App: React.FC = () => {
     localStorage.setItem('ECOLAW_PLAN_CONFIGS', JSON.stringify(planConfigs));
   }, [planConfigs]);
 
+  useEffect(() => {
+    localStorage.setItem('ECOLAW_VIEW_MODE', viewMode);
+  }, [viewMode]);
+
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentInitialMode, setPaymentInitialMode] = useState<'SUBSCRIPTION' | 'CREDITS'>('SUBSCRIPTION');
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
@@ -38,23 +47,34 @@ const App: React.FC = () => {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchUserProfile(session.user);
+      if (session) fetchUserProfile(session.user, true);
       else setIsAuthLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Only react to explicit sign-in/sign-out, NOT token refreshes or tab focus events
+      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return;
+      
       setSession(session);
-      if (session) fetchUserProfile(session.user);
-      else {
+      if (session) {
+        // Don't re-fetch if we already have profile data for this user
+        if (lastFetchedUserId.current === session.user.id) return;
+        fetchUserProfile(session.user, event === 'SIGNED_IN');
+      } else {
+        lastFetchedUserId.current = null;
         setIsAuthLoading(false);
         setCurrentUser(INITIAL_USERS[1]);
+        setViewMode('USER');
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserProfile = async (user: any) => {
+  const fetchUserProfile = async (user: any, shouldSetViewMode = false) => {
+    // Skip if already fetched for this exact user in this session
+    if (lastFetchedUserId.current === user.id && !shouldSetViewMode) return;
+    
     try {
       const { data, error } = await supabase.from('users').select('*').eq('id', user.id).single();
       
@@ -72,7 +92,11 @@ const App: React.FC = () => {
           joinedAt: data.created_at,
           lastActive: new Date().toISOString()
         });
-        setViewMode(isAdmin ? 'ADMIN' : 'USER');
+        // Only set view mode on initial load, not on re-renders triggered by token refresh
+        if (shouldSetViewMode) {
+          setViewMode(isAdmin ? 'ADMIN' : 'USER');
+        }
+        lastFetchedUserId.current = user.id;
       } else {
         // NEW USER: Auto-create record in 'users' table
         const newUser = {
@@ -270,6 +294,8 @@ const App: React.FC = () => {
             planConfigs={planConfigs}
             onUpdatePlanConfigs={setPlanConfigs}
             currentSession={session}
+            currentUser={currentUser}
+            onTriggerUpgrade={handleOpenPayment}
           />
         </Suspense>
       )}

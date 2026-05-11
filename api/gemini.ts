@@ -63,6 +63,23 @@ Nếu phát hiện yêu cầu của người dùng thuộc các trường hợp 
 5. Soạn thảo hợp đồng M&A phức tạp hoặc hồ sơ IPO.
 6. Người dùng trực tiếp yêu cầu "Gặp luật sư", "Cần luật sư", "Thuê luật sư".
 
+🔥 QUY TẮC "VẼ SƠ ĐỒ VỤ VIỆC" (CASE_MAP):
+Nếu người dùng yêu cầu "vẽ sơ đồ", "tạo sơ đồ", "trực quan hóa" một vụ việc, bạn BẮT BUỘC phải tạo một JSON block ở CUỐI CÙNG câu trả lời theo đúng định dạng sau. 
+TUYỆT ĐỐI KHÔNG SỬ DỤNG MERMAID HOẶC BẤT KỲ CÔNG CỤ NÀO KHÁC. CHỈ DÙNG JSON:
+\`\`\`json
+{
+  "type": "CASE_MAP",
+  "nodes": [
+    { "id": "nguyen_don_1", "name": "Nguyễn Văn A", "group": "person", "color": "#3b82f6", "val": 20 },
+    { "id": "tai_san_1", "name": "Sổ đỏ", "group": "asset", "color": "#8b5cf6", "val": 15 }
+  ],
+  "links": [
+    { "source": "nguyen_don_1", "target": "tai_san_1", "label": "Sở hữu" }
+  ]
+}
+\`\`\`
+Màu sắc khuyên dùng: person (#3b82f6 xanh, #ef4444 đỏ, #10b981 lá), asset (#8b5cf6 tím), document (#f59e0b vàng).
+
 CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
 
 ---
@@ -126,7 +143,26 @@ CẤU TRÚC TRẢ LỜI (BẮT BUỘC DÙNG MARKDOWN):
       `;
     }
 
-    const fullSystemInstruction = `${BASE_SYSTEM_INSTRUCTION}\n\n=== AGENT PERSONA (Dàn Agent) ===\n${persona}\n\n${customKbInstruction}\n\n=== OUTPUT STYLE ===\n${styleInstruction}`;
+    let fullSystemInstruction = `${BASE_SYSTEM_INSTRUCTION}\n\n=== AGENT PERSONA (Dàn Agent) ===\n${persona}\n\n${customKbInstruction}\n\n=== OUTPUT STYLE ===\n${styleInstruction}`;
+
+    if (agentType === 'SILENT_MAP') {
+        fullSystemInstruction = `
+        Bạn là hệ thống trích xuất thực thể. Nhiệm vụ duy nhất của bạn là đọc hội thoại và tạo ra một sơ đồ vụ việc.
+        TUYỆT ĐỐI KHÔNG TRẢ LỜI HAY GIẢI THÍCH GÌ THÊM. CHỈ XUẤT RA JSON BLOCK DƯỚI ĐÂY, KHÔNG DÙNG MERMAID HOẶC BẤT KỲ ĐỊNH DẠNG NÀO KHÁC.
+        \`\`\`json
+        {
+          "type": "CASE_MAP",
+          "nodes": [
+            { "id": "nguyen_don_1", "name": "Nguyễn Văn A", "group": "person", "color": "#3b82f6", "val": 20 }
+          ],
+          "links": [
+            { "source": "nguyen_don_1", "target": "tai_san_1", "label": "Sở hữu" }
+          ]
+        }
+        \`\`\`
+        Màu sắc khuyên dùng: person (#3b82f6, #ef4444, #10b981), asset (#8b5cf6), document (#f59e0b).
+        `;
+    }
 
     // Filter clean history
     const cleanHistory = (history || []).filter((msg: any) => 

@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase';
 import { AgentSettingsModal } from './AgentSettingsModal';
 import { PlanSettingsModal } from './PlanSettingsModal';
 import { Users, Activity, BarChart3, Bot, Search, Edit2, Trash2, Zap, DollarSign, Lock, Unlock, X, PlusCircle, CreditCard, Check, Wifi, Globe, Server, Radio, Cpu, Calendar, Save, Receipt, Eye, Clock, CheckCircle2, User } from 'lucide-react';
+import { UserMenu } from './UserMenu';
 
 interface AdminDashboardProps {
   users: UserProfile[];
@@ -16,10 +17,12 @@ interface AdminDashboardProps {
   planConfigs: Record<UserLevel, PlanConfig>;
   onUpdatePlanConfigs: (newConfigs: Record<UserLevel, PlanConfig>) => void;
   currentSession: any;
+  currentUser: UserProfile;
+  onTriggerUpgrade: (mode?: 'SUBSCRIPTION' | 'CREDITS') => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  users: initialUsers, onCommand, onDeleteUser, onUpdateUser, onAddUser, agentConfigs, onUpdateAgentConfigs, planConfigs, onUpdatePlanConfigs, currentSession
+  users: initialUsers, onCommand, onDeleteUser, onUpdateUser, onAddUser, agentConfigs, onUpdateAgentConfigs, planConfigs, onUpdatePlanConfigs, currentSession, currentUser, onTriggerUpgrade
 }) => {
   const [activeTab, setActiveTab] = useState('OVERVIEW');
   const [showAgentModal, setShowAgentModal] = useState(false);
@@ -351,7 +354,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <button onClick={() => setActiveTab('AGENTS')} className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 ${activeTab === 'AGENTS' ? 'bg-emerald-600/10 text-emerald-400' : 'text-slate-500 hover:text-white'}`}><Bot size={18}/> Agents AI</button>
         </nav>
         <div className="mt-auto">
-             <button onClick={() => onCommand('/user')} className="w-full py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300">ĐĂNG XUẤT</button>
+             <button onClick={() => onCommand('/user')} className="w-full py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300">VỀ TRANG CHAT</button>
         </div>
       </aside>
       <main className="flex-1 p-8 overflow-y-auto">
@@ -362,12 +365,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  activeTab === 'TRANSACTIONS' ? 'Yêu cầu Đăng ký Dịch vụ' : 
                  activeTab === 'PLANS' ? 'Cấu hình Gói dịch vụ' : 'Mạng lưới Agent'}
             </h1>
-            <div className="flex items-center gap-2 text-slate-500 text-sm">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                System Live
+            <div className="flex items-center gap-4 text-slate-500 text-sm">
+                <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    System Live
+                </div>
+                <UserMenu currentUser={currentUser} onTriggerUpgrade={onTriggerUpgrade} onCommand={onCommand} />
             </div>
         </header>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Cpu, Zap, BookOpen, Terminal, Activity, HelpCircle, ArrowDown, ArrowUp, X, AlertTriangle, ChevronDown, Check, LayoutGrid, Edit2, Save, Star, Calendar, FileText, Trash2, Copy, Download, MessageSquare, Plus, Edit3, ChevronLeft, Menu, PanelLeftClose, Paperclip, Mic, Database } from 'lucide-react';
+import { Cpu, Zap, BookOpen, Terminal, Activity, HelpCircle, ArrowDown, ArrowUp, X, AlertTriangle, ChevronDown, Check, LayoutGrid, Edit2, Save, Star, Calendar, FileText, Trash2, Copy, Download, MessageSquare, Plus, Edit3, ChevronLeft, Menu, PanelLeftClose, Paperclip, Mic, Database, Clock, GitGraph } from 'lucide-react';
 import { Message, AgentStage, UserProfile, AgentType, ResponseStyle, AgentConfig, AGENTS_LIST, MOCK_LAWYERS, LawyerProfile, DocumentTemplate, ChatSession } from '../types';
 import { sendMessageToGemini } from '../services/geminiService';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -11,6 +11,8 @@ import { DraftDocumentModal } from './DraftDocumentModal';
 import { KnowledgeBaseModal } from './KnowledgeBaseModal';
 import { retrieveRelevantContext } from '../services/ragService';
 import { supabase } from '../services/supabase';
+import { UserMenu } from './UserMenu';
+import { CaseRelationMap } from './tools/CaseRelationMap';
 
 interface UserChatProps {
   currentUser: UserProfile;
@@ -23,7 +25,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, onCommand, agen
   // Session State
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [showSidebar, setShowSidebar] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
   const [processingSessionId, setProcessingSessionId] = useState<string | null>(null);
 
   // Computed Messages from Current Session
@@ -96,8 +98,11 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, onCommand, agen
   const [agentStage, setAgentStage] = useState<AgentStage>(AgentStage.IDLE);
   const [showCreditModal, setShowCreditModal] = useState(false);
   
-  // isLanding is true if no session is selected OR current session has no messages
-  const isLanding = !currentSessionId || messages.length === 0;
+  // Track if user explicitly entered chat mode (even with empty session)
+  const [forceChatMode, setForceChatMode] = useState(false);
+
+  // isLanding is true only when no session is selected AND not in force chat mode
+  const isLanding = !currentSessionId && !forceChatMode;
 
   const [selectedAgent, setSelectedAgent] = useState<AgentType>('GENERAL');
   const [showAgentMenu, setShowAgentMenu] = useState(false);
@@ -116,6 +121,12 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, onCommand, agen
 
   // KB Modal State
   const [showKBModal, setShowKBModal] = useState(false);
+
+  // Case Map Modal State
+  const [showCaseMap, setShowCaseMap] = useState(false);
+  const [activeCaseMapData, setActiveCaseMapData] = useState<any>(undefined);
+  const [isSyncingCaseMap, setIsSyncingCaseMap] = useState(false);
+  const [autoSyncCaseMap, setAutoSyncCaseMap] = useState(false);
 
   // Booking Modal State
   const [bookingLawyer, setBookingLawyer] = useState<LawyerProfile | null>(null);
@@ -187,6 +198,50 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, onCommand, agen
     if (!isLanding) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, agentStage, isLanding]);
 
+  const syncCaseMap = async (sessionId?: string) => {
+      const targetSessionId = sessionId || currentSessionId;
+      if (!targetSessionId) return;
+      const currentSession = sessions.find(s => s.id === targetSessionId);
+      if (!currentSession || currentSession.messages.length === 0) return;
+
+      setIsSyncingCaseMap(true);
+      try {
+          const historyForApi = currentSession.messages.map(m => ({
+              role: m.role,
+              parts: [{ text: m.text }]
+          }));
+
+          const response = await sendMessageToGemini(
+              "Hãy tạo JSON sơ đồ vụ việc cho cuộc hội thoại này.",
+              historyForApi,
+              'SILENT_MAP',
+              'CONCISE',
+              undefined,
+              currentUser.level
+          );
+
+          let dataText = response.text;
+          const jsonRegex = /```(?:json)?\s*(\{[\s\S]*?"type"\s*:\s*"CASE_MAP"[\s\S]*?\})\s*```/;
+          const match = dataText.match(jsonRegex);
+          if (match) {
+              dataText = match[1];
+          } else {
+              // Try to find raw JSON block
+              const rawMatch = dataText.match(/(\{[\s\S]*?"type"\s*:\s*"CASE_MAP"[\s\S]*?\})/);
+              if (rawMatch) dataText = rawMatch[1];
+          }
+
+          const data = JSON.parse(dataText);
+          if (data && data.type === 'CASE_MAP') {
+              setActiveCaseMapData(data);
+          }
+      } catch (err) {
+          console.error("Failed to sync case map:", err);
+      } finally {
+          setIsSyncingCaseMap(false);
+      }
+  };
+
   const handleCreateNewSession = useCallback(() => {
       const newSession: ChatSession = {
           id: Date.now().toString(),
@@ -197,6 +252,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, onCommand, agen
       };
       setSessions(prev => [newSession, ...prev]);
       setCurrentSessionId(newSession.id);
+      setForceChatMode(true); // Always go to chat view
   }, []);
 
   const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
@@ -209,6 +265,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, onCommand, agen
           });
           if (currentSessionId === sessionId) {
               setCurrentSessionId(null);
+          setForceChatMode(false);
           }
       }
   };
@@ -308,6 +365,19 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, onCommand, agen
       let rawText = response.text;
       let requiresHuman = false;
       let suggestedLawyers: LawyerProfile[] = [];
+      let caseMapData: any = null;
+
+      // Extract CASE_MAP json if exists
+      const jsonRegex = /```json\s*(\{[\s\S]*?"type"\s*:\s*"CASE_MAP"[\s\S]*?\})\s*```/;
+      const match = rawText.match(jsonRegex);
+      if (match) {
+          try {
+              caseMapData = JSON.parse(match[1]);
+              rawText = rawText.replace(match[0], ''); // Remove from text
+          } catch (e) {
+              console.error("Failed to parse CASE_MAP json", e);
+          }
+      }
 
       // Check for Human Handoff Trigger
       if (rawText.includes('[[HUMAN_REQUIRED]]')) {
@@ -344,9 +414,17 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, onCommand, agen
           return text.trim();
       };
 
-      const parts = rawText.split("💡 GỢI Ý TIẾP THEO");
+      // Split by lightbulb and "gợi ý tiếp theo" case-insensitively, allowing markdown bolding
+      const parts = rawText.split(/(?:\*\*|###)?\s*💡\s*GỢI Ý TIẾP THEO\s*(?:\*\*|:)?/i);
       const cleanText = parts[0].trim();
-      const suggestions = parts[1] ? parts[1].split('\n').filter(l => l.trim().startsWith('-')).map(cleanSuggestion).slice(0, 4) : [];
+      
+      let suggestions: string[] = [];
+      if (parts.length > 1) {
+          suggestions = parts[1].split('\n')
+              .filter(l => l.trim().startsWith('-'))
+              .map(cleanSuggestion)
+              .slice(0, 4);
+      }
 
       setAgentStage(AgentStage.REVIEWING);
       await new Promise(r => setTimeout(r, 400));
@@ -361,7 +439,7 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, onCommand, agen
                       text: cleanText,
                       suggestedQuestions: suggestions,
                       suggestedLawyers: requiresHuman ? suggestedLawyers : undefined,
-                      metadata: { ...m.metadata, source: response.source === 'BACKEND' ? 'SPECIALIZED_KB' : 'GENERAL_AI' }
+                      metadata: { ...m.metadata, source: response.source === 'BACKEND' ? 'SPECIALIZED_KB' : 'GENERAL_AI', caseMapData: caseMapData }
                   } : m),
                   updatedAt: new Date()
               };
@@ -371,6 +449,11 @@ export const UserChat: React.FC<UserChatProps> = ({ currentUser, onCommand, agen
       
       setAgentStage(AgentStage.IDLE);
       setProcessingSessionId(null);
+      
+      // Trigger Auto Sync if enabled and no case map was generated natively
+      if (autoSyncCaseMap && !caseMapData) {
+          syncCaseMap(activeSessionForRequest);
+      }
     } catch (e) {
       console.error("Error in processAIResponse:", e);
       setAgentStage(AgentStage.IDLE);
@@ -704,7 +787,7 @@ ${textToSend}
     return (
       <div className="min-h-[100dvh] bg-[#020617] text-white flex flex-col relative font-inter overflow-y-auto">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none"></div>
-        <header className="p-4 sm:p-6 flex justify-between items-center z-10">
+        <header className="p-4 sm:p-6 flex justify-between items-center relative z-50">
             {/* ... header content ... */}
             <div className="font-bold text-xl font-mono">ecolaw<span className="text-emerald-500">.ai</span></div>
             <div className="flex items-center gap-4">
@@ -726,19 +809,7 @@ ${textToSend}
                    <button onClick={() => setResponseStyle('CONCISE')} className={`px-3 py-1 rounded-full text-xs ${responseStyle === 'CONCISE' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}>Ngắn gọn</button>
                    <button onClick={() => setResponseStyle('DEEP')} className={`px-3 py-1 rounded-full text-xs ${responseStyle === 'DEEP' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}>Chuyên sâu</button>
                 </div>
-                <div className="text-right flex items-center gap-3">
-                    <div>
-                        <div className="text-xs font-bold text-slate-300">{currentUser.name}</div>
-                        <div onClick={() => onTriggerUpgrade('CREDITS')} className="text-[10px] text-emerald-400 cursor-pointer hover:underline">{currentUser.credits} CR (Nạp thêm)</div>
-                    </div>
-                    <button 
-                        onClick={() => supabase.auth.signOut()}
-                        className="p-1.5 hover:bg-red-500/10 text-slate-400 hover:text-red-400 rounded-md transition-colors"
-                        title="Đăng xuất"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                    </button>
-                </div>
+                <UserMenu currentUser={currentUser} onTriggerUpgrade={onTriggerUpgrade} onCommand={onCommand} />
             </div>
         </header>
         <main className="flex-1 flex flex-col items-center justify-start pt-10 px-4 relative z-10 pb-20">
@@ -878,7 +949,48 @@ ${textToSend}
                      )})}
                 </div>
             </div>
-            
+
+            {/* Recent Chat Sessions */}
+            {sessions.length > 0 && (
+                <div className="w-full max-w-4xl mt-10 px-4 animate-fade-in-up">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <Clock size={14} className="text-emerald-500" /> Hội thoại gần đây
+                        </h2>
+                        <button 
+                            onClick={handleCreateNewSession}
+                            className="text-xs text-emerald-500 hover:text-emerald-400 flex items-center gap-1 transition-colors"
+                        >
+                            <Plus size={12}/> Tạo mới
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {sessions.slice(0, 6).map(s => (
+                            <button
+                                key={s.id}
+                                onClick={() => { setCurrentSessionId(s.id); setForceChatMode(true); }}
+                                className="bg-slate-900/60 border border-slate-800 hover:border-emerald-500/40 hover:bg-slate-800/50 p-4 rounded-xl text-left transition-all group"
+                            >
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="p-1.5 bg-slate-800 rounded-lg text-emerald-400 group-hover:bg-emerald-500/10 transition-colors">
+                                        <MessageSquare size={13} />
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 font-mono ml-auto">
+                                        {new Date(s.updatedAt).toLocaleDateString('vi-VN')}
+                                    </span>
+                                </div>
+                                <div className="font-semibold text-slate-200 text-sm line-clamp-1 group-hover:text-emerald-400 transition-colors mb-1">
+                                    {s.title}
+                                </div>
+                                <div className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                                    {s.messages[s.messages.length - 1]?.text?.slice(0, 80) || 'Không có nội dung'}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="w-full max-w-5xl mt-12 px-4">
                 <NewsSection />
             </div>
@@ -970,7 +1082,7 @@ ${textToSend}
       <div className="flex-1 flex flex-col h-full relative min-w-0 w-full">
         
         {/* HEADER */}
-        <header className="h-12 md:h-14 border-b border-slate-800 bg-slate-950/95 backdrop-blur-sm flex items-center justify-between px-2.5 md:px-5 z-20 flex-shrink-0 w-full">
+        <header className="h-12 md:h-14 border-b border-slate-800 bg-slate-950/95 backdrop-blur-sm flex items-center justify-between px-2.5 md:px-5 relative z-50 flex-shrink-0 w-full">
              <div className="flex items-center gap-1.5 md:gap-3 min-w-0">
                  <button onClick={() => setShowSidebar(!showSidebar)} className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800 shrink-0">
                     {showSidebar ? <ChevronLeft size={18}/> : <Menu size={18}/>}
@@ -1007,13 +1119,7 @@ ${textToSend}
                  </div>
                  
                  <button onClick={() => setShowKBModal(true)} className="hidden md:flex items-center gap-2 text-slate-400 hover:text-emerald-400 px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-colors" title="Knowledge Base"><Database size={16}/> <span className="text-xs font-bold">RAG</span></button>
-                 {(currentUser?.email?.toLowerCase() === 'caophi.nasani@gmail.com' || currentUser?.level === 'Enterprise') && (
-                   <button onClick={() => onCommand('/admin')} className="hidden md:block text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors" title="Admin Dashboard"><LayoutGrid size={18}/></button>
-                 )}
-                 <button onClick={() => onTriggerUpgrade('SUBSCRIPTION')} className="bg-emerald-900/30 text-emerald-400 text-[10px] md:text-xs px-2 py-1.5 md:px-3 md:py-1.5 rounded-lg border border-emerald-500/30 hover:bg-emerald-900/50 transition-colors font-mono font-bold whitespace-nowrap min-h-[32px]">
-                     <span className="hidden sm:inline">UPGRADE</span>
-                     <span className="sm:hidden">NẠP</span>
-                 </button>
+                 <UserMenu currentUser={currentUser} onTriggerUpgrade={onTriggerUpgrade} onCommand={onCommand} />
              </div>
         </header>
 
@@ -1063,7 +1169,59 @@ ${textToSend}
             {/* Right Pane: Chat Messages */}
             <div className="flex-1 min-w-0 w-full overflow-y-auto px-3 py-3 md:px-8 md:py-6 space-y-3 md:space-y-5 relative" onClick={() => { if (window.innerWidth < 768 && showSidebar) setShowSidebar(false); }}>
                 {/* Render Messages in Chronological Order */}
-                {messages.map(msg => (
+                {messages.length === 0 ? (
+                    <div className="h-full w-full flex flex-col items-center justify-center p-4">
+                        <div className="w-full max-w-3xl animate-fade-in-up">
+                            <div className="text-center mb-10">
+                                <h2 className="text-4xl font-black text-slate-100 tracking-tight flex flex-col items-center gap-3">
+                                    <div className="p-4 bg-emerald-500/10 rounded-full">
+                                        <MessageSquare className="text-emerald-500" size={32}/>
+                                    </div>
+                                    ECOLAW<span className="text-emerald-500">.AI</span>
+                                </h2>
+                                <p className="text-slate-400 mt-2">Trợ lý pháp lý thông minh của bạn</p>
+                            </div>
+
+                            <div className="mb-4 flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Hội thoại gần đây</h3>
+                            </div>
+
+                            {sessions.length === 0 ? (
+                                <div className="text-center p-8 bg-slate-900/50 rounded-2xl border border-slate-800">
+                                    <p className="text-slate-500">Chưa có dữ liệu. Hãy bắt đầu cuộc hội thoại mới bằng cách gõ vào ô chat bên dưới.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {sessions.slice(0, 6).map(s => (
+                                        <button 
+                                            key={s.id} 
+                                            onClick={() => setCurrentSessionId(s.id)}
+                                            className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 p-5 rounded-2xl text-left transition-all hover:bg-slate-800/50 group flex flex-col justify-between min-h-[140px]"
+                                        >
+                                            <div className="flex items-start justify-between mb-3 w-full">
+                                                <div className="p-2 bg-slate-950 text-emerald-400 rounded-xl group-hover:bg-emerald-500/10 group-hover:scale-110 transition-all">
+                                                    <Clock size={16} />
+                                                </div>
+                                                <span className="text-[10px] text-slate-500 font-mono">
+                                                    {new Date(s.updatedAt).toLocaleDateString('vi-VN')}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-slate-200 line-clamp-1 mb-1 group-hover:text-emerald-400 transition-colors">
+                                                    {s.title}
+                                                </h3>
+                                                <p className="text-xs text-slate-500 line-clamp-2">
+                                                    {s.messages[0]?.text || "Không có nội dung"}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    messages.map(msg => (
             <div key={msg.id} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group`}>
                 {msg.role === 'model' && <div className="w-6 h-6 md:w-8 md:h-8 rounded bg-slate-900 border border-slate-700 hidden sm:flex items-center justify-center mr-2 md:mr-3 text-emerald-500 shrink-0 mt-1"><Cpu size={14}/></div>}
                 <div className={`min-w-0 max-w-[90%] sm:max-w-[85%] md:max-w-[80%] rounded-2xl px-3.5 py-3 md:px-5 md:py-4 border relative ${msg.role === 'user' ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-100 rounded-tr-sm' : 'bg-slate-900/80 border-slate-800 text-slate-200 rounded-tl-sm'} break-words overflow-hidden`}>
@@ -1161,7 +1319,19 @@ ${textToSend}
                                             );
                                         })()
                                     ) : (
-                                        <MarkdownRenderer content={msg.text} />
+                                        <>
+                                            <MarkdownRenderer content={msg.text} />
+                                            {msg.metadata?.caseMapData && (
+                                                <div className="mt-4 pt-3 border-t border-slate-800 animate-fade-in-up">
+                                                    <button 
+                                                        onClick={() => { setActiveCaseMapData(msg.metadata.caseMapData); setShowCaseMap(true); }}
+                                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/50 text-emerald-400 rounded-lg text-sm font-bold transition-all"
+                                                    >
+                                                        <GitGraph size={16} /> Mở Sơ Đồ Vụ Việc
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </>
                             )}
@@ -1239,7 +1409,8 @@ ${textToSend}
                     )}
                 </div>
             </div>
-        ))}
+        ))
+        )}
         {agentStage !== AgentStage.IDLE && currentSessionId === processingSessionId && (
             <div className="flex justify-center my-4">
                 <div className="bg-slate-900 border border-emerald-500/30 px-6 py-2 rounded-full text-emerald-400 text-xs font-mono animate-pulse flex items-center gap-2"><Activity size={14}/> {agentStage === AgentStage.ROUTING ? 'ROUTING...' : agentStage === AgentStage.SPECIALIST ? 'CONNECTING AGENT...' : 'ANALYZING...'}</div>
@@ -1268,6 +1439,21 @@ ${textToSend}
              >
                 <LayoutGrid size={16}/>
                 <span className="hidden md:inline text-[10px] font-bold uppercase">Tiện Ích</span>
+             </button>
+
+             <button 
+                type="button"
+                onClick={() => {
+                    setShowCaseMap(true);
+                    if (!activeCaseMapData) {
+                        syncCaseMap();
+                    }
+                }}
+                className="bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/50 text-emerald-400 hover:text-emerald-300 p-2.5 md:px-3 md:py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shrink-0"
+                title="Trực quan hóa vụ việc"
+             >
+                <Database size={16}/>
+                <span className="hidden md:inline text-[10px] font-bold uppercase">Sơ Đồ</span>
              </button>
 
              <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex-1 relative group min-w-0">
@@ -1438,6 +1624,16 @@ ${textToSend}
           isOpen={showKBModal}
           onClose={() => setShowKBModal(false)}
           userLevel={currentUser.level}
+      />
+      <CaseRelationMap 
+          isOpen={showCaseMap}
+          title={activeCaseMapData ? "Sơ đồ Quan hệ Vụ việc (AI)" : "Sơ đồ Quan hệ Vụ việc (Demo)"}
+          onClose={() => setShowCaseMap(false)}
+          data={activeCaseMapData}
+          onSync={() => syncCaseMap()}
+          isSyncing={isSyncingCaseMap}
+          autoSync={autoSyncCaseMap}
+          onToggleAutoSync={() => setAutoSyncCaseMap(!autoSyncCaseMap)}
       />
       </div>
     </div>
